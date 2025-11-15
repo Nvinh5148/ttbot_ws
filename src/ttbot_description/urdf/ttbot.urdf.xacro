@@ -1,0 +1,344 @@
+<?xml version="1.0"?>
+<robot name="ttbot" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- Arg dùng cho Gazebo / Ignition -->
+  <xacro:arg name="is_ignition" default="true"/>
+
+  <!-- =============== INCLUDE GAZEBO =============== -->
+  <xacro:include filename="$(find ttbot_description)/urdf/ttbot_gazebo.xacro" />
+
+  <!-- ================= CONSTANTS ================= -->
+  <xacro:property name="wheel_radius" value="0.15"/>        <!-- bán kính bánh xe -->
+  <xacro:property name="wheel_width"  value="0.06"/>        <!-- bề dày bánh -->
+  <xacro:property name="wheelbase"    value="0.8"/>         <!-- khoảng cách giữa 2 trục -->
+  <xacro:property name="track_width"  value="0.55"/>        <!-- khoảng cách 2 bánh cùng trục -->
+  <xacro:property name="chassis_length" value="1.2"/>       <!-- chiều dài thân -->
+  <xacro:property name="chassis_width"  value="0.6"/>       <!-- chiều rộng thân -->
+  <xacro:property name="chassis_height" value="0.25"/>      <!-- chiều cao thân -->
+
+  <!-- ================= HELPER MACROS ================= -->
+  <xacro:macro name="inertial_cyl" params="mass r l">
+    <inertial>
+      <mass value="${mass}"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="${(1.0/2.0)*mass*r*r}"
+               iyy="${(1.0/12.0)*mass*(3*r*r + l*l)}"
+               izz="${(1.0/12.0)*mass*(3*r*r + l*l)}"
+               ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+  </xacro:macro>
+
+  <!-- ================= BASE LINK ================= -->
+  <link name="base_link">
+    <!-- Thân chính (visual) -->
+    <visual>
+      <geometry>
+        <box size="${chassis_length} ${chassis_width} ${chassis_height}"/>
+      </geometry>
+      <!-- thân trên mặt đất -->
+      <origin xyz="0 0 ${wheel_radius + 0.5 * chassis_height}" rpy="0 0 0"/>
+      <material name="red"><color rgba="0.8 0.1 0.1 1.0"/></material>
+    </visual>
+
+    <!-- Mui xe -->
+    <visual>
+      <origin xyz="0 0 ${wheel_radius + chassis_height}" rpy="0 0 0"/>
+      <geometry><box size="0.8 0.5 0.2"/></geometry>
+      <material name="darkred"><color rgba="0.8 0.1 0.1 1.0"/></material>
+    </visual>
+
+    <!-- Gương hai bên -->
+    <visual>
+      <origin xyz="0.4 ${0.5*chassis_width + 0.05} ${wheel_radius + chassis_height}"/>
+      <geometry><box size="0.05 0.1 0.05"/></geometry>
+      <material name="gray"><color rgba="0.5 0.5 0.5 1"/></material>
+    </visual>
+    <visual>
+      <origin xyz="0.4 ${-0.5*chassis_width - 0.05} ${wheel_radius + chassis_height}"/>
+      <geometry><box size="0.05 0.1 0.05"/></geometry>
+      <material name="gray"><color rgba="0.5 0.5 0.5 1"/></material>
+    </visual>
+
+    <!-- Đèn pha -->
+    <visual>
+      <origin xyz="${0.5*chassis_length + 0.03} ${0.25*chassis_width} ${wheel_radius + 0.6*chassis_height}"/>
+      <geometry><sphere radius="0.05"/></geometry>
+      <material name="white"><color rgba="1 1 1 1"/></material>
+    </visual>
+    <visual>
+      <origin xyz="${0.5*chassis_length + 0.03} ${-0.25*chassis_width} ${wheel_radius + 0.6*chassis_height}"/>
+      <geometry><sphere radius="0.05"/></geometry>
+      <material name="white"><color rgba="1 1 1 1"/></material>
+    </visual>
+
+    <!-- COLLISION thân -->
+    <collision>
+      <origin xyz="0 0 ${wheel_radius + 0.5 * chassis_height}" rpy="0 0 0"/>
+      <geometry>
+        <box size="${chassis_length} ${chassis_width} ${chassis_height}"/>
+      </geometry>
+    </collision>
+
+    <!-- INERTIAL thân -->
+    <inertial>
+      <origin xyz="0 0 ${wheel_radius + 0.5 * chassis_height}" rpy="0 0 0"/>
+      <mass value="15.0"/>
+      <inertia
+        ixx="${(1.0/12.0)*15.0*(chassis_width*chassis_width + chassis_height*chassis_height)}"
+        iyy="${(1.0/12.0)*15.0*(chassis_length*chassis_length + chassis_height*chassis_height)}"
+        izz="${(1.0/12.0)*15.0*(chassis_length*chassis_length + chassis_width*chassis_width)}"
+        ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+  </link>
+
+  <!-- ================= WHEEL MACRO ================= -->
+  <xacro:macro name="wheel_link" params="name">
+    <link name="${name}">
+      <visual>
+        <origin rpy="1.5708 0 0"/>
+        <geometry><cylinder radius="${wheel_radius}" length="${wheel_width}"/></geometry>
+        <material name="black"><color rgba="0.1 0.1 0.1 1.0"/></material>
+      </visual>
+      <collision>
+        <origin rpy="1.5708 0 0"/>
+        <geometry><cylinder radius="${wheel_radius}" length="${wheel_width}"/></geometry>
+      </collision>
+      <xacro:inertial_cyl mass="1.0" r="${wheel_radius}" l="${wheel_width}"/>
+    </link>
+  </xacro:macro>
+
+  <!-- ================= WHEEL + STEERING LINKS ================= -->
+
+  <!-- Link trung gian cho lái -->
+  <!-- Link trung gian cho lái - phải có collision + inertial -->
+  <link name="front_left_steering_link">
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.01 0.01 0.01"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.01"/>
+      <inertia
+        ixx="1e-6" iyy="1e-6" izz="1e-6"
+        ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+  </link>
+
+  <link name="front_right_steering_link">
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.01 0.01 0.01"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.01"/>
+      <inertia
+        ixx="1e-6" iyy="1e-6" izz="1e-6"
+        ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+  </link>
+
+
+  <!-- Bánh -->
+  <xacro:wheel_link name="front_left_wheel"/>
+  <xacro:wheel_link name="front_right_wheel"/>
+  <xacro:wheel_link name="rear_left_wheel"/>
+  <xacro:wheel_link name="rear_right_wheel"/>
+
+  <!-- ================= JOINTS ================= -->
+
+  <!-- FRONT STEERING JOINTS (Ackermann) -->
+  <joint name="front_left_steering_joint" type="revolute">
+    <parent link="base_link"/>
+    <child link="front_left_steering_link"/>
+    <origin xyz="${0.5*wheelbase} ${0.5*track_width} ${wheel_radius}" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-0.5236" upper="0.5236" effort="20" velocity="1.0"/>
+  </joint>
+
+  <joint name="front_right_steering_joint" type="revolute">
+    <parent link="base_link"/>
+    <child link="front_right_steering_link"/>
+    <origin xyz="${0.5*wheelbase} ${-0.5*track_width} ${wheel_radius}" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-0.5236" upper="0.5236" effort="20" velocity="1.0"/>
+    <mimic joint="front_left_steering_joint" multiplier="1.0"/>
+  </joint>
+
+  <!-- STEERING_LINK -> WHEEL : quay bánh quanh trục Y -->
+  <joint name="front_left_wheel_joint" type="continuous">
+    <parent link="front_left_steering_link"/>
+    <child link="front_left_wheel"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+  </joint>
+
+  <joint name="front_right_wheel_joint" type="continuous">
+    <parent link="front_right_steering_link"/>
+    <child link="front_right_wheel"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+  </joint>
+
+  <!-- REAR DRIVE JOINTS (motor) -->
+  <joint name="rear_left_wheel_joint" type="continuous">
+    <parent link="base_link"/>
+    <child link="rear_left_wheel"/>
+    <origin xyz="${-0.5*wheelbase} ${0.5*track_width} ${wheel_radius}" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+  </joint>
+
+  <joint name="rear_right_wheel_joint" type="continuous">
+    <parent link="base_link"/>
+    <child link="rear_right_wheel"/>
+    <origin xyz="${-0.5*wheelbase} ${-0.5*track_width} ${wheel_radius}" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+  </joint>
+
+
+  <!-- ================= IMU LINK ================= -->
+  <link name="imu_link">
+    <!-- Hình trụ nhỏ giống tụ/IMU -->
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <!-- Bán kính ~3cm, cao ~6cm -->
+        <cylinder radius="0.04" length="0.05"/>
+      </geometry>
+      <material name="imu_gray">
+        <color rgba="1 1 0 1"/>
+      </material>
+    </visual>
+
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.03" length="0.06"/>
+      </geometry>
+    </collision>
+
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.01"/>
+      <inertia
+        ixx="1e-6" iyy="1e-6" izz="1e-6"
+        ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+  </link>
+
+
+
+  <!-- ================= IMU JOINT ================= -->
+  <!-- Đặt IMU trên nóc xe, ngay chính giữa -->
+  <joint name="imu_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="imu_link"/>
+
+    <!-- 
+      wheel_radius = 0.15
+      chassis_height = 0.25
+      Nóc (mui) ~ wheel_radius + chassis_height + 0.1 = 0.5
+      Đặt tâm IMU nhô lên thêm ~3cm: +0.13
+    -->
+    <origin xyz="0 0 ${wheel_radius + chassis_height + 0.13}" rpy="0 0 0"/>
+    <axis xyz="0 0 0"/>
+  </joint>
+
+
+
+  <!-- ================= GPS LINK ================= -->
+  <link name="gps_link">
+    <!-- Hình trụ nhỏ màu đen -->
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <!-- Bán kính / chiều cao tương tự IMU -->
+        <cylinder radius="0.04" length="0.05"/>
+      </geometry>
+      <material name="gps_black">
+        <color rgba="0 0 0 1"/> <!-- Màu đen -->
+      </material>
+    </visual>
+
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.03" length="0.06"/>
+      </geometry>
+    </collision>
+
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.01"/>
+      <inertia
+        ixx="1e-6" iyy="1e-6" izz="1e-6"
+        ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+  </link>
+
+  <!-- ================= GPS JOINT ================= -->
+  <!-- Đặt GPS trên nóc xe, lệch nhẹ về phía trước so với IMU -->
+  <joint name="gps_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="gps_link"/>
+
+    <!--
+      IMU đang dùng:
+        z = wheel_radius + chassis_height + 0.13
+      GPS: cùng độ cao, lệch trục x về phía trước 10cm
+    -->
+    <origin xyz="0.1 0 ${wheel_radius + chassis_height + 0.13}" rpy="0 0 0"/>
+    <axis xyz="0 0 0"/>
+  </joint>
+
+
+
+
+  <!-- ================= ROS2_CONTROL ================= -->
+
+  <ros2_control name="ttbot_system" type="system">
+    <hardware>
+      <xacro:if value="$(arg is_ignition)">
+        <plugin>ign_ros2_control/IgnitionSystem</plugin>
+      </xacro:if>
+      <xacro:unless value="$(arg is_ignition)">
+        <plugin>gz_ros2_control/GazeboSystem</plugin>
+      </xacro:unless>
+    </hardware>
+
+    <!-- Bánh sau: điều khiển velocity -->
+    <joint name="rear_left_wheel_joint">
+      <command_interface name="velocity"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <joint name="rear_right_wheel_joint">
+      <command_interface name="velocity"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <!-- Góc lái: điều khiển position -->
+    <joint name="front_left_steering_joint">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <joint name="front_right_steering_joint">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+  </ros2_control>
+
+  <!-- ================= GAZEBO MACRO ================= -->
+  <xacro:ttbot_gazebo/>
+
+</robot>
