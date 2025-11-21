@@ -72,17 +72,41 @@ Provides:
 
 
 ---
-
+## 🧩 Prerequisites
+### 1. Ubuntu and ROS
+Ubuntu >= 20.04
+ROS2 >= Foxy (Recommend to use ROS2-Humble).
+Installation guide:
+https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debs.html
+_Note: Please install the required ROS 2 packages._
+### 2. OSQP
+```bash
+cd ~
+git clone https://github.com/osqp/osqp.git
+cd osqp
+mkdir build && cd build
+cmake ..
+make -j$(nproc)
+sudo make install
+```
+### 3. Eigen
+```bash
+cd ~
+git clone https://gitlab.com/libeigen/eigen.git
+cd eigen
+mkdir build && cd build
+cmake ..
+sudo make install
+```
 ## ⚙️ Build Instructions (ROS2 Humble)
 
-### 1. Source ROS2
+### 1. Source ROS2 
 ```bash
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
 source /opt/ros/humble/setup.bash
-
 ```
 
-### 1. Build & source the workspace 
+### 2. Build & source the workspace 
 ```bash
 cd ~/ttbot_ws
 colcon build 
