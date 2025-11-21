@@ -15,6 +15,8 @@ find_package(nav_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
+find_package(ament_index_cpp REQUIRED)
+
 
 # include thư mục header của chính package
 include_directories(include)
@@ -24,7 +26,7 @@ add_executable(ackermann_controller
   src/ackermann_controller.cpp
 )
 
-ament_target_dependencies(ackermann_controller
+ament_target_dependencies(ackermann_scontroller
   rclcpp
   geometry_msgs
   std_msgs
@@ -33,6 +35,7 @@ ament_target_dependencies(ackermann_controller
   nav_msgs
   tf2_ros
   tf2_geometry_msgs
+  ament_index_cpp
 )
 
 install(
