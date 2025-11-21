@@ -75,9 +75,11 @@ Provides:
 ## 🧩 Prerequisites
 ### 1. Ubuntu and ROS
 Ubuntu >= 20.04
+
 ROS2 >= Foxy (Recommend to use ROS2-Humble).
-Installation guide:
-https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debs.html
+
+Installation guide: https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debs.html
+
 _Note: Please install the required ROS 2 packages._
 ### 2. OSQP
 ```bash
