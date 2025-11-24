@@ -14,15 +14,11 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 // Định nghĩa không gian tên và các hằng số
 namespace {
-    constexpr const char* kPackageName = "ttbot_controller";
-    // Tái sử dụng normalizeAngle từ Stanley (hoặc định nghĩa lại)
-    double normalizeAngle(double angle) {
-        while (angle > M_PI) angle -= 2.0 * M_PI;
-        while (angle < -M_PI) angle += 2.0 * M_PI;
-        return angle;
-    }
-}
+constexpr const char* kPackageName = "ttbot_controller";
 
+
+
+} // namespace
 
 // Khởi tạo MPC Controller
 MpcController::MpcController()
@@ -35,11 +31,12 @@ MpcController::MpcController()
     this->declare_parameter("path_file", "path.csv");
 
     // MPC Parameters
-    this->declare_parameter("N_p", 20);      // Prediction Horizon
-    this->declare_parameter("dt_mpc", 0.1);  // Bước thời gian (s)
-    this->declare_parameter("Q_x", 10.0);    // Trọng số theo dõi x/y
-    this->declare_parameter("Q_psi", 50.0);  // Trọng số theo dõi góc yaw
-    this->declare_parameter("R_omega", 1.0); // Trọng số điều khiển omega
+    this->declare_parameter("N_p", 10);
+    this->declare_parameter("dt_mpc", 0.1);
+    this->declare_parameter("Q_ey", 10.0);
+    this->declare_parameter("Q_epsi", 5.0);
+    this->declare_parameter("R_delta", 1.0);
+
 
     // Load
     desired_speed_ = this->get_parameter("desired_speed").as_double();
@@ -47,11 +44,12 @@ MpcController::MpcController()
     double max_steer_deg = this->get_parameter("max_steer_deg").as_double();
     path_file_     = this->get_parameter("path_file").as_string();
 
-    N_p_ = this->get_parameter("N_p").as_int();
+    N_p_    = this->get_parameter("N_p").as_int();
     dt_mpc_ = this->get_parameter("dt_mpc").as_double();
-    Q_x_ = this->get_parameter("Q_x").as_double();
-    Q_psi_ = this->get_parameter("Q_psi").as_double();
-    R_omega_ = this->get_parameter("R_omega").as_double();
+    Q_ey_   = this->get_parameter("Q_ey").as_double();
+    Q_epsi_ = this->get_parameter("Q_epsi").as_double();
+    R_delta_= this->get_parameter("R_delta").as_double();
+
 
     // Ràng buộc điều khiển
     max_steer_ = max_steer_deg * M_PI / 180.0;
@@ -66,7 +64,7 @@ MpcController::MpcController()
     // 2. Load Path
     // Tái sử dụng hàm loadPathFromCSV() đã có (cần sao chép vào tệp này hoặc khai báo bên ngoài)
     loadPathFromCSV(); 
-
+    current_index_ = 0;
     // 3. Subscribers & Publishers
     odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
         "/odometry/filtered", 10,
@@ -80,6 +78,60 @@ MpcController::MpcController()
 // =================================================================================
 // Destructor: Dọn dẹp bộ nhớ thủ công (Bắt buộc với OSQP)
 // =================================================================================
+
+void MpcController::computeRefAtIndex(size_t idx,
+                                      double &rx, double &ry, double &psi_ref)
+{
+    idx = std::min(idx, path_points_.size() - 1);
+    rx  = path_points_[idx].first;
+    ry  = path_points_[idx].second;
+
+    // Tính hướng của path tại idx từ điểm lân cận
+    size_t idx2 = std::min(idx + 1, path_points_.size() - 1);
+    if (idx2 == idx && idx > 0) {
+        idx2 = idx - 1;
+    }
+
+    double dx = path_points_[idx2].first  - rx;
+    double dy = path_points_[idx2].second - ry;
+    psi_ref   = std::atan2(dy, dx);
+}
+
+void MpcController::computeErrorState(double x, double y, double psi,
+                                      double rx, double ry, double psi_ref,
+                                      double &ey, double &epsi)
+{
+    // Vector từ điểm ref đến xe
+    double dx = x - rx;
+    double dy = y - ry;
+
+    // Lỗi ngang e_y: chiếu lên trục vuông góc với path
+    // trục path: (cos(psi_ref), sin(psi_ref))
+    // trục ngang trái: (-sin, cos)
+    ey = -std::sin(psi_ref) * dx + std::cos(psi_ref) * dy;
+
+    // Lỗi góc
+    double dpsi = psi - psi_ref;
+    while (dpsi > M_PI)  dpsi -= 2.0*M_PI;
+    while (dpsi < -M_PI) dpsi += 2.0*M_PI;
+    epsi = dpsi;
+}
+void MpcController::linearizeErrorModel(double v, double dt)
+{
+    Eigen::Matrix2d A_cont;
+    Eigen::Vector2d B_cont;
+
+    A_cont << 0.0, v,
+              0.0, 0.0;
+
+    B_cont << 0.0,
+              v / wheel_base_;
+
+    Ad_ = Eigen::Matrix2d::Identity() + A_cont * dt;
+    Bd_ = B_cont * dt;
+}
+
+
 MpcController::~MpcController()
 {
     // Dọn dẹp solver
@@ -190,20 +242,31 @@ void MpcController::linearizeModel(double v, double psi, double dt)
 // ================================
 size_t MpcController::findClosestPoint(double x, double y)
 {
-  size_t closest_index = 0;
+  if (path_points_.empty()) {
+    return 0;
+  }
+
+  // Chỉ tìm từ current_index_ trở về sau
+  size_t start_i = current_index_;
+  size_t closest_index = start_i;
   double min_dist_sq   = std::numeric_limits<double>::infinity();
 
-  for (size_t i = 0; i < path_points_.size(); ++i) {
+  for (size_t i = start_i; i < path_points_.size(); ++i) {
     double dx = x - path_points_[i].first;
     double dy = y - path_points_[i].second;
     double dist_sq = dx * dx + dy * dy;
+
     if (dist_sq < min_dist_sq) {
       min_dist_sq = dist_sq;
       closest_index = i;
     }
   }
+
+  // Cập nhật luôn index hiện tại để lần sau không lùi lại
+  current_index_ = closest_index;
   return closest_index;
 }
+
 // =================================================================================
 // Helper: Eigen to OSQP Conversion
 // =================================================================================
@@ -212,18 +275,17 @@ void MpcController::eigenToOSQPCsc(
     OSQPCscMatrix& out_mat, 
     OSQPFloat*& out_x, OSQPInt*& out_i, OSQPInt*& out_p)
 {
-   if (!mat.isCompressed()) return;
+    if (!mat.isCompressed()) return;
 
-    OSQPInt nnz = mat.nonZeros();
+    OSQPInt nnz  = mat.nonZeros();
     OSQPInt cols = mat.cols();
     OSQPInt rows = mat.rows();
 
-    // Thay c_malloc bằng malloc
+    // KHÔNG free ở đây nữa, chỉ cấp phát mới
     out_x = (OSQPFloat*)malloc(sizeof(OSQPFloat) * nnz);
     out_i = (OSQPInt*)malloc(sizeof(OSQPInt) * nnz);
     out_p = (OSQPInt*)malloc(sizeof(OSQPInt) * (cols + 1));
 
-    // 2. Copy dữ liệu
     for (int k = 0; k < nnz; k++) {
         out_x[k] = (OSQPFloat)mat.valuePtr()[k];
         out_i[k] = (OSQPInt)mat.innerIndexPtr()[k];
@@ -232,185 +294,155 @@ void MpcController::eigenToOSQPCsc(
         out_p[k] = (OSQPInt)mat.outerIndexPtr()[k];
     }
 
-    // 3. Gán vào struct tạm
     out_mat.m = rows;
     out_mat.n = cols;
     out_mat.p = out_p;
     out_mat.i = out_i;
     out_mat.x = out_x;
     out_mat.nzmax = nnz;
-    out_mat.nz = -1; // CSC format
-    out_mat.owned = 0; // User owned memory
+    out_mat.nz = -1;
+    out_mat.owned = 0;
 }
+
 // =================================================================================
 // SOLVE MPC (CORE LOGIC)
 // =================================================================================
-Control MpcController::solveMPC(const State& current_state)
+Control MpcController::solveMPC(double ey0, double epsi0)
 {
     // --- 1. Cấu hình kích thước ---
-    int nx = 3; // x, y, psi
-    int nu = 1; // omega
-    int N = N_p_;
-    
-    // Số biến: [x0, ..., xN] (N+1 state) + [u0, ..., u(N-1)] (N input)
-    // Tổng cộng: z = [x0, x1, ... xN, u0, u1, ... u(N-1)]
-    // Note: Cách sắp xếp biến: State trước, Input sau.
+    int nx = 2; // [ey, epsi]
+    int nu = 1; // delta (góc lái)
+    int N  = N_p_;
+
     int n_vars = (N + 1) * nx + N * nu;
-    
-    // Số ràng buộc:
-    // - Động lực học: N bước * nx trạng thái = N * nx (Phương trình đẳng thức)
-    // - Trạng thái đầu: nx (x0 = current)
-    // - Giới hạn Input: N * nu
-    int n_eq = (N + 1) * nx; // Bao gồm cả init state
-    int n_ineq = N * nu;
+    int n_eq   = (N + 1) * nx; // x0 + N bước động lực học
+    int n_ineq = N * nu;       // giới hạn delta
     int n_cons = n_eq + n_ineq;
 
-    // --- 2. Tuyến tính hóa & Reference ---
-    linearizeModel(desired_speed_, current_state[2], dt_mpc_);
-    
-    // Map lại ma trận Ad, Bd từ vector phẳng
-    Eigen::Map<Eigen::Matrix<double, 3, 3>> Ad(A_flat_.data());
-    Eigen::Map<Eigen::Matrix<double, 3, 1>> Bd(B_flat_.data());
+    // --- 2. Tuyến tính hóa mô hình lỗi ---
+    linearizeErrorModel(desired_speed_, dt_mpc_);
+    Eigen::Matrix2d Ad = Ad_;
+    Eigen::Vector2d Bd = Bd_;
 
-    size_t start_idx = findClosestPoint(current_state[0], current_state[1]);
-
-    // --- 3. Xây dựng Ma trận P (Cost) & Vector q ---
+    // --- 3. Cost: P, q (q = 0 vì ref = 0 cho ey, epsi) ---
     Eigen::SparseMatrix<double> P(n_vars, n_vars);
     std::vector<Eigen::Triplet<double>> p_triplets;
     Eigen::VectorXd q = Eigen::VectorXd::Zero(n_vars);
 
-    // Phần State (Q matrix)
+    // State cost
     for (int k = 0; k <= N; ++k) {
         int offset = k * nx;
-        p_triplets.emplace_back(offset + 0, offset + 0, Q_x_);
-        p_triplets.emplace_back(offset + 1, offset + 1, Q_x_);
-        p_triplets.emplace_back(offset + 2, offset + 2, Q_psi_);
-
-        // Tính q = -Q * x_ref
-        size_t path_idx = std::min(start_idx + k, path_points_.size() - 1);
-        double rx = path_points_[path_idx].first;
-        double ry = path_points_[path_idx].second;
-        // Yaw reference (đơn giản hóa bằng 0 hoặc tính đạo hàm đường đi)
-        double rpsi = 0.0; 
-        if (path_idx < path_points_.size() - 1) {
-            rpsi = std::atan2(path_points_[path_idx+1].second - ry, 
-                              path_points_[path_idx+1].first - rx);
-        }
-        // Chuẩn hóa góc lệch
-        double delta_psi = normalizeAngle(rpsi);
-
-        q(offset + 0) = -Q_x_ * rx;
-        q(offset + 1) = -Q_x_ * ry;
-        q(offset + 2) = -Q_psi_ * delta_psi;
+        p_triplets.emplace_back(offset + 0, offset + 0, Q_ey_);   // ey
+        p_triplets.emplace_back(offset + 1, offset + 1, Q_epsi_); // epsi
     }
 
-    // Phần Input (R matrix)
+    // Input cost
     int u_start = (N + 1) * nx;
     for (int k = 0; k < N; ++k) {
         int offset = u_start + k * nu;
-        p_triplets.emplace_back(offset, offset, R_omega_);
+        p_triplets.emplace_back(offset, offset, R_delta_);
     }
     P.setFromTriplets(p_triplets.begin(), p_triplets.end());
 
-    // --- 4. Xây dựng Ma trận A (Constraints) & Vectors l, u ---
+    // --- 4. Constraints A, l, u ---
     Eigen::SparseMatrix<double> A_cons(n_cons, n_vars);
     std::vector<Eigen::Triplet<double>> a_triplets;
     Eigen::VectorXd l = Eigen::VectorXd::Zero(n_cons);
     Eigen::VectorXd u = Eigen::VectorXd::Zero(n_cons);
 
-    // 4a. Ràng buộc trạng thái đầu (x0 = current) -> Rows: 0, 1, 2
+    // 4a. Ràng buộc trạng thái đầu: x0 = [ey0, epsi0]
+    Eigen::Vector2d x0;
+    x0 << ey0, epsi0;
     for (int i = 0; i < nx; ++i) {
         a_triplets.emplace_back(i, i, 1.0);
-        l(i) = current_state[i];
-        u(i) = current_state[i];
+        l(i) = x0(i);
+        u(i) = x0(i);
     }
 
     // 4b. Ràng buộc động lực học: x_{k+1} = Ad*x_k + Bd*u_k
     // => -Ad*x_k + I*x_{k+1} - Bd*u_k = 0
     for (int k = 0; k < N; ++k) {
-        int row_idx = (k + 1) * nx; // Bắt đầu từ row 3 (x1)
-        int xk_idx = k * nx;
+        int row_idx = (k + 1) * nx;   // bắt đầu từ row 2
+        int xk_idx  = k * nx;
         int xk1_idx = (k + 1) * nx;
-        int uk_idx = u_start + k * nu;
+        int uk_idx  = u_start + k * nu;
 
         // -Ad * x_k
         for (int r = 0; r < nx; ++r) {
             for (int c = 0; c < nx; ++c) {
-                if (std::abs(Ad(r, c)) > 1e-5)
+                if (std::abs(Ad(r, c)) > 1e-9) {
                     a_triplets.emplace_back(row_idx + r, xk_idx + c, -Ad(r, c));
+                }
             }
         }
+
         // +I * x_{k+1}
         for (int r = 0; r < nx; ++r) {
             a_triplets.emplace_back(row_idx + r, xk1_idx + r, 1.0);
         }
+
         // -Bd * u_k
         for (int r = 0; r < nx; ++r) {
-            if (std::abs(Bd(r)) > 1e-5)
+            if (std::abs(Bd(r)) > 1e-9) {
                 a_triplets.emplace_back(row_idx + r, uk_idx, -Bd(r));
+            }
         }
 
-        // Bounds = 0 (Equality)
-        for (int r = 0; r < nx; ++r) {
-            l(row_idx + r) = 0.0;
-            u(row_idx + r) = 0.0;
-        }
+        // equality: 0
+        l(row_idx + 0) = 0.0;
+        u(row_idx + 0) = 0.0;
+        l(row_idx + 1) = 0.0;
+        u(row_idx + 1) = 0.0;
     }
 
-    // 4c. Ràng buộc Input (Inequality): -max <= u <= max
+    // 4c. Ràng buộc input: -max_steer_ <= delta_k <= max_steer_
     int ineq_start = n_eq;
     for (int k = 0; k < N; ++k) {
         int row = ineq_start + k;
-        int col = u_start + k;
+        int col = u_start + k * nu;
         a_triplets.emplace_back(row, col, 1.0);
-        l(row) = -max_omega_;
-        u(row) = max_omega_;
+        l(row) = -max_steer_;
+        u(row) =  max_steer_;
     }
+
     A_cons.setFromTriplets(a_triplets.begin(), a_triplets.end());
 
-    // --- 5. Setup OSQP & Solve ---
-    
-    // Clean old memory (Thay c_free bằng free và xuống dòng)
-        if (solver_) { osqp_cleanup(solver_); solver_ = nullptr; }
-        
-        if (P_x_) free(P_x_); 
-        if (P_i_) free(P_i_); 
-        if (P_p_) free(P_p_);
-        
-        if (A_x_) free(A_x_); 
-        if (A_i_) free(A_i_); 
-        if (A_p_) free(A_p_);
-        
-        if (q_data_) free(q_data_); 
-        if (l_data_) free(l_data_); 
-        if (u_data_) free(u_data_);
+    // --- 5. Setup OSQP & Solve (như cũ) ---
+    if (solver_) { osqp_cleanup(solver_); solver_ = nullptr; }
 
-    // Prepare structs
+    if (P_x_) free(P_x_); 
+    if (P_i_) free(P_i_); 
+    if (P_p_) free(P_p_);
+    if (A_x_) free(A_x_); 
+    if (A_i_) free(A_i_); 
+    if (A_p_) free(A_p_);
+    if (q_data_) free(q_data_); 
+    if (l_data_) free(l_data_); 
+    if (u_data_) free(u_data_);
+
     OSQPCscMatrix P_mat, A_mat;
-    eigenToOSQPCsc(P, P_mat, P_x_, P_i_, P_p_);
+    eigenToOSQPCsc(P,     P_mat, P_x_, P_i_, P_p_);
     eigenToOSQPCsc(A_cons, A_mat, A_x_, A_i_, A_p_);
 
-    // Copy vectors
     q_data_ = (OSQPFloat*)malloc(sizeof(OSQPFloat) * n_vars);
     l_data_ = (OSQPFloat*)malloc(sizeof(OSQPFloat) * n_cons);
     u_data_ = (OSQPFloat*)malloc(sizeof(OSQPFloat) * n_cons);
 
-    for(int i=0; i<n_vars; ++i) q_data_[i] = (OSQPFloat)q(i);
-    for(int i=0; i<n_cons; ++i) {
+    for (int i = 0; i < n_vars; ++i) q_data_[i] = (OSQPFloat)q(i);
+    for (int i = 0; i < n_cons; ++i) {
         l_data_[i] = (OSQPFloat)l(i);
         u_data_[i] = (OSQPFloat)u(i);
     }
 
-    // Settings
     if (settings_) free(settings_);
-    settings_ = (OSQPSettings*)malloc(sizeof(OSQPSettings)); // Sửa ở đây
+    settings_ = (OSQPSettings*)malloc(sizeof(OSQPSettings));
     osqp_set_default_settings(settings_);
-    settings_->verbose = 0; 
-    settings_->alpha = 1.0;
+    settings_->verbose = 0;
+    settings_->alpha   = 1.0;
 
-    // OSQP SETUP (v1.0 API)
     OSQPInt exitflag = osqp_setup(
-        &solver_, &P_mat, q_data_, &A_mat, l_data_, u_data_, n_cons, n_vars, settings_
+        &solver_, &P_mat, q_data_, &A_mat, l_data_, u_data_,
+        (OSQPInt)n_cons, (OSQPInt)n_vars, settings_
     );
 
     if (exitflag != 0) {
@@ -418,53 +450,57 @@ Control MpcController::solveMPC(const State& current_state)
         return {0.0};
     }
 
-    // SOLVE
     osqp_solve(solver_);
 
-    // --- 6. Lấy kết quả ---
-    double optimal_omega = 0.0;
-    if (solver_->info->status_val == OSQP_SOLVED || 
-        solver_->info->status_val == OSQP_SOLVED_INACCURATE) 
-    {
-        // Biến điều khiển u0 nằm ở vị trí u_start
-        optimal_omega = (double)solver_->solution->x[u_start];
+    double delta_opt = 0.0;
+    if (solver_->info->status_val == OSQP_SOLVED ||
+        solver_->info->status_val == OSQP_SOLVED_INACCURATE) {
+        delta_opt = (double)solver_->solution->x[u_start];
     } else {
         RCLCPP_WARN(get_logger(), "OSQP Failed. Status: %s", solver_->info->status);
     }
 
-    return {optimal_omega};
+    return {delta_opt};
 }
 
 void MpcController::odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
 {
-    if (path_points_.empty()) {
-        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000, "No path loaded yet!");
-        return;
-    }
+    if (path_points_.empty()) return;
 
-    // Lấy trạng thái hiện tại
     double x   = msg->pose.pose.position.x;
     double y   = msg->pose.pose.position.y;
     double yaw = tf2::getYaw(msg->pose.pose.orientation);
-    
-    State current_state = {x, y, yaw};
 
-    // 1. Giải MPC
-    Control optimal_control = solveMPC(current_state);
-    double optimal_omega = optimal_control[0];
+    // 1. Reference trên path
+    size_t idx = findClosestPoint(x, y);
+    double rx, ry, psi_ref;
+    computeRefAtIndex(idx, rx, ry, psi_ref);
 
-    // 2. Xuất bản lệnh
-    geometry_msgs::msg::TwistStamped cmd_msg;
-    cmd_msg.header.stamp    = this->now();
-    cmd_msg.header.frame_id = "base_link";
-    cmd_msg.twist.linear.x  = desired_speed_; // Vận tốc tuyến tính cố định
-    cmd_msg.twist.angular.z = optimal_omega;  // Vận tốc góc từ MPC
-    
-    cmd_pub_->publish(cmd_msg);
+    // 2. Lỗi theo path
+    double ey0, epsi0;
+    computeErrorState(x, y, yaw, rx, ry, psi_ref, ey0, epsi0);
 
-    RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 500,
-        "MPC: omega=%.3f rad/s, x=%.2f, y=%.2f",
-        optimal_omega, x, y);
+    // 3. Giải MPC cho (ey, epsi)
+    Control u_opt = solveMPC(ey0, epsi0);
+    double delta  = u_opt[0];
+
+    // 4. Convert sang yaw_rate
+    double omega = (desired_speed_ / wheel_base_) * std::tan(delta);
+
+    // 5. Publish Twist như hệ thống cũ
+    geometry_msgs::msg::TwistStamped cmd;
+    cmd.header.stamp    = this->now();
+    cmd.header.frame_id = "base_link";
+    cmd.twist.linear.x  = desired_speed_;
+    cmd.twist.angular.z = omega;
+
+    cmd_pub_->publish(cmd);
+    RCLCPP_INFO(this->get_logger(),
+    "LOG_COMPARE | x=%.3f y=%.3f yaw=%.3f | ref_x=%.3f ref_y=%.3f ref_yaw=%.3f | ey=%.3f epsi=%.3f",
+    x, y, yaw,
+    rx, ry, psi_ref,
+    ey0, epsi0);
+
 }
 
 int main(int argc, char * argv[])

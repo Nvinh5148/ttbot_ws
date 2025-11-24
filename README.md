@@ -110,7 +110,7 @@ source /opt/ros/humble/setup.bash
 
 ### 2. Build & source the workspace 
 ```bash
-cd ~/ttbot_ws
+cd ~/Desktop/ttbot_ws
 colcon build 
 source install/setup.bash
 ```

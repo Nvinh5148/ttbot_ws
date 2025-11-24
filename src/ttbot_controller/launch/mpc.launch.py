@@ -4,73 +4,76 @@ from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
+
 def generate_launch_description():
 
     # =========================================
-    # 1. KHAI BÁO THAM SỐ (Arguments)
+    # 1. KHAI BÁO THAM SỐ LAUNCH
     # =========================================
-    
-    # --- Đường dẫn file path ---
+
+    # --- PATH FILE ---
     path_file_arg = DeclareLaunchArgument(
         "path_file",
-        default_value="path_uturn.csv",
-        description="Tên file CSV trong thư mục share/ttbot_controller/path/"
+
+        default_value="path_u_to_S.csv",
+        description="Tên file CSV trong share/ttbot_controller/path/"
+
     )
 
-    # --- Thông số vật lý xe & Vận tốc ---
+    # --- THÔNG SỐ XE ---
     desired_speed_arg = DeclareLaunchArgument(
         "desired_speed",
         default_value="1.5",
-        description="Vận tốc mong muốn (m/s)"
+        description="Vận tốc xe (m/s)"
     )
-    
+
     wheel_base_arg = DeclareLaunchArgument(
         "wheel_base",
         default_value="0.8",
-        description="Khoảng cách trục bánh xe (m)"
+        description="Chiều dài trục bánh xe"
     )
 
     max_steer_deg_arg = DeclareLaunchArgument(
         "max_steer_deg",
         default_value="60.0",
-        description="Góc lái tối đa (độ)"
+        description="Giới hạn góc lái (độ)"
     )
 
-    # --- Tham số MPC (Quan trọng để Tune) ---
-    # Horizon & Time step
+    # --- THAM SỐ MPC ---
     Np_arg = DeclareLaunchArgument(
         "N_p",
-        default_value="20",
-        description="Prediction Horizon (Số bước dự đoán)"
+        default_value="10",
+        description="Prediction Horizon"
     )
-    
+
     dt_mpc_arg = DeclareLaunchArgument(
         "dt_mpc",
         default_value="0.1",
-        description="Bước thời gian rời rạc hóa (s)"
+        description="Bước thời gian MPC (s)"
     )
 
-    # Trọng số Cost Function
-    Q_x_arg = DeclareLaunchArgument(
-        "Q_x",
+    # Cost function weights (đúng theo ey, epsi, delta)
+    Q_ey_arg = DeclareLaunchArgument(
+        "Q_ey",
         default_value="10.0",
-        description="Trọng số phạt sai số vị trí (x, y)"
+        description="Trọng số lỗi ngang e_y"
     )
 
-    Q_psi_arg = DeclareLaunchArgument(
-        "Q_psi",
-        default_value="50.0",
-        description="Trọng số phạt sai số góc hướng (yaw)"
+    Q_epsi_arg = DeclareLaunchArgument(
+        "Q_epsi",
+        default_value="5.0",
+        description="Trọng số lỗi góc e_psi"
     )
 
-    R_omega_arg = DeclareLaunchArgument(
-        "R_omega",
+    R_delta_arg = DeclareLaunchArgument(
+        "R_delta",
         default_value="1.0",
-        description="Trọng số phạt tín hiệu điều khiển (omega) - Giúp xe đi mượt hơn"
+        description="Trọng số độ lớn góc lái delta"
     )
+
 
     # =========================================
-    # 2. CẤU HÌNH NODE
+    # 2. CẤU HÌNH NODE MPC
     # =========================================
     mpc_node = Node(
         package="ttbot_controller",
@@ -78,32 +81,33 @@ def generate_launch_description():
         name="mpc_controller",
         output="screen",
         parameters=[{
-            # Map từ LaunchConfiguration vào ROS Parameters
-            "path_file": LaunchConfiguration("path_file"),
-            "desired_speed": LaunchConfiguration("desired_speed"),
-            "wheel_base": LaunchConfiguration("wheel_base"),
-            "max_steer_deg": LaunchConfiguration("max_steer_deg"),
-            
-            "N_p": LaunchConfiguration("N_p"),
-            "dt_mpc": LaunchConfiguration("dt_mpc"),
-            "Q_x": LaunchConfiguration("Q_x"),
-            "Q_psi": LaunchConfiguration("Q_psi"),
-            "R_omega": LaunchConfiguration("R_omega"),
+            "path_file":      LaunchConfiguration("path_file"),
+            "desired_speed":  LaunchConfiguration("desired_speed"),
+            "wheel_base":     LaunchConfiguration("wheel_base"),
+            "max_steer_deg":  LaunchConfiguration("max_steer_deg"),
+
+            "N_p":            LaunchConfiguration("N_p"),
+            "dt_mpc":         LaunchConfiguration("dt_mpc"),
+            "Q_ey":           LaunchConfiguration("Q_ey"),
+            "Q_epsi":         LaunchConfiguration("Q_epsi"),
+            "R_delta":        LaunchConfiguration("R_delta"),
         }]
     )
 
+    # =========================================
+    # 3. RETURN LAUNCH DESCRIPTION
+    # =========================================
     return LaunchDescription([
-        # Load các arguments
         path_file_arg,
         desired_speed_arg,
         wheel_base_arg,
         max_steer_deg_arg,
+
         Np_arg,
         dt_mpc_arg,
-        Q_x_arg,
-        Q_psi_arg,
-        R_omega_arg,
-        
-        # Chạy node
+        Q_ey_arg,
+        Q_epsi_arg,
+        R_delta_arg,
+
         mpc_node
     ])
