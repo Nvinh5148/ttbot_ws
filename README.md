@@ -38,7 +38,7 @@ Includes:
 Ackermann control module.
 
 Features:
-- Stanley controller
+- Stanley controller, MPC controller
 - Steering angle control  
 - Speed control for drive wheels  
 - Subscribes to `/cmd_vel` or `/ackermann_cmd`  
