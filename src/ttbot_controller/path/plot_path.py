@@ -20,17 +20,10 @@ with open(path_file) as f:
         ys.append(float(row[1]))
 
 # ==== ĐỔI TRỤC (X <-> Y) ====
-<<<<<<< HEAD
 plt.plot(ys, xs, "-o")
 
 # ==== Nếu muốn lật Y lại cho cùng chiều ROS, bật dòng dưới ====
 # plt.gca().invert_yaxis()
-=======
-plt.plot(ys, xs, "o")
-
-# ==== Nếu muốn lật Y lại cho cùng chiều ROS, bật dòng dưới ====
-#plt.gca().invert_yaxis()
->>>>>>> c905fff ( available mpc)
 
 plt.xlabel("Y (m)")
 plt.ylabel("X (m)")
