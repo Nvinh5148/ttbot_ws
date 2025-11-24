@@ -16,8 +16,6 @@
 namespace {
 constexpr const char* kPackageName = "ttbot_controller";
 
-
-
 } // namespace
 
 // Khởi tạo MPC Controller
@@ -29,6 +27,9 @@ MpcController::MpcController()
     this->declare_parameter("wheel_base", 0.8);
     this->declare_parameter("max_steer_deg", 60.0);
     this->declare_parameter("path_file", "path.csv");
+    this->declare_parameter("goal_tolerance", 0.3);  // [m] bán kính để coi là tới đích
+
+
 
     // MPC Parameters
     this->declare_parameter("N_p", 10);
@@ -50,6 +51,9 @@ MpcController::MpcController()
     Q_epsi_ = this->get_parameter("Q_epsi").as_double();
     R_delta_= this->get_parameter("R_delta").as_double();
 
+    // Mục tiêu đến đích
+    goal_tolerance_ = this->get_parameter("goal_tolerance").as_double();
+    reached_goal_ = false;  // xe chưa tới đích
 
     // Ràng buộc điều khiển
     max_steer_ = max_steer_deg * M_PI / 180.0;
@@ -475,7 +479,7 @@ void MpcController::odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
     size_t idx = findClosestPoint(x, y);
     double rx, ry, psi_ref;
     computeRefAtIndex(idx, rx, ry, psi_ref);
-
+    
     // 2. Lỗi theo path
     double ey0, epsi0;
     computeErrorState(x, y, yaw, rx, ry, psi_ref, ey0, epsi0);
@@ -494,6 +498,22 @@ void MpcController::odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
     cmd.twist.linear.x  = desired_speed_;
     cmd.twist.angular.z = omega;
 
+
+    // 6. Them logic dừng xe khi tới đích
+    const auto &goal = path_points_.back();
+    double dx_g = x - goal.first;
+    double dy_g = y - goal.second;
+    double dist_to_goal = std::sqrt(dx_g*dx_g + dy_g*dy_g);
+    // Nếu đã vào vùng gần điểm cuối -> ép xe dừng
+    if (dist_to_goal < goal_tolerance_ && idx >= path_points_.size() - 2) {
+        cmd.twist.linear.x  = 0.0;
+        cmd.twist.angular.z = 0.0;
+        RCLCPP_INFO(this->get_logger(),
+                    "GOAL REACHED, STOP !!!!!!!1. dist=%.3f", dist_to_goal);
+    }
+
+
+    //7. Publish command
     cmd_pub_->publish(cmd);
     RCLCPP_INFO(this->get_logger(),
     "LOG_COMPARE | x=%.3f y=%.3f yaw=%.3f | ref_x=%.3f ref_y=%.3f ref_yaw=%.3f | ey=%.3f epsi=%.3f",
