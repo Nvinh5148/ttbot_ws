@@ -134,6 +134,9 @@ ros2 run ttbot_controller path_publisher --ros-args -p path_file:=path_u_to_S.cs
 
 ### 7. Run imu node 
 ```bash
+sudo usermod -aG dialout $USER
+
+logout then login again 
 ros2 run adis16488_driver adis16488_node --ros-args -p port:=/dev/ttyUSB0 -p baudrate:=230400
 ```
 
