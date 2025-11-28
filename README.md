@@ -5,6 +5,8 @@ This project includes control, sensor processing, localization, and system bring
 
 ---
 
+REF: https://github.com/Nvinh5148/microros_ws
+
 ## 🚗 Overview
 
 The `ttbot_ws` workspace provides:
@@ -100,6 +102,28 @@ mkdir build && cd build
 cmake ..
 sudo make install
 ```
+
+
+### 4. USB Device Setup (Udev Rules)
+```bash
+sudo nano /etc/udev/rules.d/99-ttbot.rules
+```
+Copy and paste the following content into the file:
+```bash
+# --- IMU SENSOR ---
+# Create fixed symlink: /dev/ttbot_imu
+SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", ATTRS{serial}=="0001", SYMLINK+="ttbot_imu", MODE="0666"
+
+# --- STM32 MICRO-CONTROLLER ---
+# Create fixed symlink: /dev/ttbot_stm32
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="7523", SYMLINK+="ttbot_stm32", MODE="0666"
+```
+Apply and verify
+``` bash
+sudo udevadm control --reload-rules && sudo udevadm trigger
+```
+
+
 ## ⚙️ Build Instructions (ROS2 Humble)
 
 ### 1. Source ROS2 
@@ -137,7 +161,7 @@ ros2 launch ttbot_controller mpc.launch.py
 sudo usermod -aG dialout $USER
 
 logout then login again 
-ros2 run adis16488_driver adis16488_node --ros-args -p port:=/dev/ttyUSB0 -p baudrate:=230400
+ros2 run adis16488_driver adis16488_node --ros-args -p port:=/dev/ttbot_imu -p baudrate:=460800
 ```
 
 

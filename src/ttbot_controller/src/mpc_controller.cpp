@@ -25,7 +25,7 @@ MpcController::MpcController()
     // 1. Khai báo và Load Parameters (Dùng lại của Stanley và thêm MPC)
     this->declare_parameter("desired_speed", 1.5);
     this->declare_parameter("wheel_base", 0.8);
-    this->declare_parameter("max_steer_deg", 60.0);
+    this->declare_parameter("max_steer_deg", 30.0);
     this->declare_parameter("path_file", "path.csv");
     this->declare_parameter("goal_tolerance", 0.3);  // [m] bán kính để coi là tới đích
 

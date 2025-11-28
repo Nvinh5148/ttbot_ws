@@ -6,7 +6,7 @@ AckermannController::AckermannController(const std::string & name)
 : Node(name)
 {
     declare_parameter("wheel_radius", 0.15);
-    declare_parameter("wheel_base", 0.8);
+    declare_parameter("wheel_base", 0.65);
 
     wheel_radius_ = get_parameter("wheel_radius").as_double();
     wheel_base_   = get_parameter("wheel_base").as_double();

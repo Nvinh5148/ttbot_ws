@@ -6,8 +6,8 @@ from launch.substitutions import LaunchConfiguration
 from ament_index_python.packages import get_package_share_directory
 
 def generate_launch_description():
-    # === 1. Khai báo Argument chung cho toàn bộ hệ thống ===
-    # Giúp bạn linh hoạt chuyển đổi giữa Sim và Real robot
+    # === 1. Khai báo Argument chung ===
+    # Mặc định là True (Mô phỏng)
     use_sim_time_arg = DeclareLaunchArgument(
         'use_sim_time',
         default_value='True',
@@ -22,7 +22,6 @@ def generate_launch_description():
     localization_pkg = get_package_share_directory("ttbot_localization")
 
     # === 3. Include Simulation (Gazebo) ===
-    # Lưu ý: Kiểm tra kỹ tên file là 'gazebo.launch.py' hay 'simulation.launch.py'
     simulation_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(description_pkg, "launch", "gazebo.launch.py") 
@@ -38,9 +37,10 @@ def generate_launch_description():
             os.path.join(controller_pkg, "launch", "controller.launch.py")
         ),
         launch_arguments={
-            "use_sim_time": use_sim_time, # Truyền biến vào đây
-            "use_simple_controller": "True",
-            "use_python": "False", # Chạy bản C++
+            "use_sim_time": use_sim_time, 
+            # ĐÃ XÓA 2 dòng use_simple_controller và use_python vì file con không dùng
+            "wheel_radius": "0.15", # Có thể truyền đè tham số tại đây nếu muốn
+            "wheel_base": "0.65",
         }.items(),
     )
 
@@ -50,8 +50,7 @@ def generate_launch_description():
             os.path.join(localization_pkg, "launch", "local_localization.launch.py")
         ),
         launch_arguments={
-            "use_sim_time": use_sim_time, # <--- QUAN TRỌNG: Phải truyền vào đây
-            "use_python": "False",
+            "use_sim_time": use_sim_time, 
         }.items(),
     )
 
@@ -59,6 +58,6 @@ def generate_launch_description():
     return LaunchDescription([
         use_sim_time_arg,
         simulation_launch,
-        localization_launch, # Nên chạy EKF trước Controller để có Odom
+        localization_launch, 
         controller_launch,
     ])
