@@ -7,10 +7,8 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 def generate_launch_description():
-    # 1. Lấy đường dẫn package
     pkg_share = get_package_share_directory('ttbot_localization')
     
-    # 2. Argument: use_sim_time
     use_sim_time_arg = DeclareLaunchArgument(
         'use_sim_time',
         default_value='true',
@@ -18,8 +16,6 @@ def generate_launch_description():
     )
     use_sim_time = LaunchConfiguration('use_sim_time')
 
-    # 3. Include LOCAL Localization (Odom + IMU)
-    # Tận dụng lại file bạn đã có để publish TF: odom -> base_link
     local_localization_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(pkg_share, 'launch', 'local_localization.launch.py')
@@ -27,26 +23,27 @@ def generate_launch_description():
         launch_arguments={'use_sim_time': use_sim_time}.items()
     )
 
-    # 4. Config cho Global EKF & Navsat
     ekf_global_config = os.path.join(pkg_share, 'config', 'ekf_global.yaml')
 
-    # 5. Node: Navsat Transform (GPS Lat/Lon -> Odom X/Y)
+    # Navsat Transform (GPS Lat/Lon -> Odom X/Y)
     navsat_transform_node = Node(
         package='robot_localization',
         executable='navsat_transform_node',
         name='navsat_transform_node',
         output='screen',
         parameters=[ekf_global_config, {'use_sim_time': use_sim_time}],
+        arguments=['--ros-args', '--log-level', 'navsat_transform_node:=info'],
         remappings=[
-            ('imu/data', '/imu/data_filtered'),          # IMU đã qua lọc Madgwick [cite: 17]
-            ('gps/fix', '/gps/fix'),                     # Topic GPS từ Gazebo/Sensor thật
-            ('odometry/gps', '/odometry/gps'),           # Output: Odom từ GPS
-            ('odometry/filtered', '/odometry/global')    # Input feedback: Vị trí global hiện tại
+            ('imu', '/imu/data_filtered'),
+            ('imu/data', '/imu/data_filtered'),          # IMU đã qua lọc Madgwick 
+            ('gps/fix', '/gps/fix'),                     # Topic GPS 
+            ('odometry/filtered', '/odometry/filtered'),    # Input feedback: Vị trí global hiện tại
+            ('odometry/gps', '/odometry/gps'),              # Output
         ]
     )
 
-    # 6. Node: Global EKF (Fuse Odom + IMU + GPS_Odom)
-    # Nhiệm vụ: Publish TF map -> odom
+    # Node Global EKF (Fuse Odom + IMU + GPS_Odom)
+    #  publish TF map -> odom
     ekf_global_node = Node(
         package='robot_localization',
         executable='ekf_node',
@@ -54,9 +51,10 @@ def generate_launch_description():
         output='screen',
         parameters=[ekf_global_config, {'use_sim_time': use_sim_time}],
         remappings=[
-            ('odometry/filtered', '/odometry/global')    # Output topic của global filter
+            ('odometry/filtered', '/odometry/global')    # Output
         ]
     )
+
 
     return LaunchDescription([
         use_sim_time_arg,

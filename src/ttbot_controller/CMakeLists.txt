@@ -17,19 +17,12 @@ find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(osqp REQUIRED)
 find_package(Eigen3 REQUIRED)
-# include thư mục header của chính package
 include_directories(include)
 
-# THÊM ĐƯỜNG DẪN INCLUDE CỦA EIGEN3 VÀO ĐÂY
 include_directories(
   include
-  ${Eigen3_INCLUDE_DIRS} # <-- Bổ sung đường dẫn header của Eigen
+  ${Eigen3_INCLUDE_DIRS} 
 )
-
-
-
-
-
 
 
 
@@ -80,16 +73,16 @@ add_executable(mpc_controller src/mpc_controller.cpp)
 
 ament_target_dependencies(mpc_controller
     rclcpp
-    nav_msgs          # <-- ĐÃ SỬA: Cần cho Odometry
+    nav_msgs          
     geometry_msgs
     tf2
-    tf2_ros           # <-- ĐÃ SỬA: Cần cho tf2::getYaw
+    tf2_ros           
     ament_index_cpp
     tf2_geometry_msgs
 )
 
 target_link_libraries(mpc_controller
-    osqp::osqp # <-- THÊM OSQP VÀO ĐÂY
+    osqp::osqp 
 )
 
 install(
@@ -118,8 +111,6 @@ install(TARGETS
   DESTINATION lib/${PROJECT_NAME}
 )
 
-
-# install config + launch + path files
 install(
   DIRECTORY config launch path
   DESTINATION share/${PROJECT_NAME}/

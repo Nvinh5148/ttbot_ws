@@ -173,6 +173,25 @@ source install/setup.bash
 export QT_QPA_PLATFORM=xcb
 ros2 run ttbot_gui gui_node
 ```
+# LOCALIZATION CHECK
+## 1. CHECK SENSOR (sensor nguon)
+hz > 0
+```bash
+ros2 topic hz /gps/fix
+ros2 topic hz /imu/data_filtered
+ros2 topic hz /ackermann_controller/odom
+```
 
-
-
+## 2. CHECK TANG 1 (ekf local)
+```bash
+ros2 topic hz /odometry/filtered
+```
+## 3. CHECK TANG 2
+```bash
+ros2 topic echo --qos-reliability best_effort /odometry/gps
+```
+## 4. CHECK TF
+```bash
+ros2 run tf2_ros tf2_echo map base_link
+```
+(Nếu hiện Translation/Rotation -> Hệ thống định vị đã thành công)

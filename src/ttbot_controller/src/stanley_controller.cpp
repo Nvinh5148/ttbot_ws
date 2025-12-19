@@ -2,14 +2,12 @@
 #include <limits>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
-// Helper logs
 static double deg2rad(double deg) { return deg * M_PI / 180.0; }
 static double rad2deg(double rad) { return rad * 180.0 / M_PI; }
 
 StanleyController::StanleyController()
 : Node("stanley_controller")
 {
-    // 1. Declare Parameters
     this->declare_parameter("desired_speed", 1.5);
     this->declare_parameter("wheel_base", 0.8);
     this->declare_parameter("max_steer_deg", 30.0);
@@ -17,7 +15,6 @@ StanleyController::StanleyController()
     this->declare_parameter("k_gain", 2.0);  
     this->declare_parameter("k_soft", 1.0);  
 
-    // 2. Load Parameters
     desired_speed_ = this->get_parameter("desired_speed").as_double();
     wheel_base_    = this->get_parameter("wheel_base").as_double();
     double max_steer_deg = this->get_parameter("max_steer_deg").as_double();
@@ -27,12 +24,10 @@ StanleyController::StanleyController()
     k_soft_ = this->get_parameter("k_soft").as_double();
     goal_tolerance_ = this->get_parameter("goal_tolerance").as_double();
 
-    // Init state
     current_index_ = 0;
     has_path_ = false;
     reached_goal_ = false; 
 
-    // 3. Subscribers & Publishers
     odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
         "/odometry/filtered", 10,
         std::bind(&StanleyController::odomCallback, this, std::placeholders::_1));
@@ -77,7 +72,6 @@ size_t StanleyController::findClosestPoint(double front_x, double front_y)
     size_t closest_idx = current_index_;
     double min_dist_sq = std::numeric_limits<double>::infinity();
     
-    // Tìm kiếm xung quanh
     size_t search_limit = std::min(current_index_ + 100, path_points_.size());
     if (current_index_ == 0) search_limit = path_points_.size();
 
@@ -102,7 +96,6 @@ double StanleyController::computeSteering(double front_x, double front_y, double
     double map_x = path_points_[idx].first;
     double map_y = path_points_[idx].second;
 
-    // 1. Path Heading
     double map_yaw = 0.0;
     if (idx < path_points_.size() - 1) {
         double dx = path_points_[idx + 1].first - map_x;
@@ -114,20 +107,15 @@ double StanleyController::computeSteering(double front_x, double front_y, double
         map_yaw = std::atan2(dy, dx);
     }
 
-    // 2. Cross Track Error (Logic Cũ - Chạy đúng)
-    // Vector: PATH - ROBOT (Thay vì Robot - Path)
     double dx = map_x - front_x; 
     double dy = map_y - front_y;
     
-    // Nếu xe lệch TRÁI (Normal bên trái) -> error này sẽ Âm -> atan2 ra Âm -> Lái PHẢI (Đúng)
     double error_front_axle = -std::sin(map_yaw) * dx + std::cos(map_yaw) * dy;
 
-    // 3. Heading Error
     double theta_e = map_yaw - yaw;
     while (theta_e > M_PI) theta_e -= 2.0 * M_PI;
     while (theta_e < -M_PI) theta_e += 2.0 * M_PI;
 
-    // 4. Stanley Law (Dùng dấu + như cũ)
     double phi_d = std::atan2(k_gain_ * error_front_axle, v + k_soft_);
     double delta_raw = theta_e + phi_d;
 
@@ -136,7 +124,6 @@ double StanleyController::computeSteering(double front_x, double front_y, double
 
     double delta_clamped = std::clamp(delta_raw, -max_steer_, max_steer_);
 
-    // ==== LOG DEBUG (GIỮ LẠI ĐỂ KIỂM TRA) ====
     RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 500,
         "Stanley Log | idx: %zu | CTE: %.3f | Theta_e: %.2f | Raw: %.1f deg -> Limit: %.1f",
         idx, error_front_axle, theta_e, rad2deg(delta_raw), rad2deg(delta_clamped));
@@ -146,7 +133,6 @@ double StanleyController::computeSteering(double front_x, double front_y, double
 
 void StanleyController::odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
 {
-    // === CHỐT CHẶN DỪNG ===
     if (reached_goal_) {
         geometry_msgs::msg::TwistStamped stop_cmd;
         stop_cmd.header.stamp = this->now();
@@ -164,26 +150,22 @@ void StanleyController::odomCallback(const nav_msgs::msg::Odometry::SharedPtr ms
     double yaw = tf2::getYaw(msg->pose.pose.orientation);
     double v = desired_speed_; 
 
-    // === CHECK GOAL ===
     double dx_g = x - path_points_.back().first;
     double dy_g = y - path_points_.back().second;
     double dist_to_goal = std::sqrt(dx_g*dx_g + dy_g*dy_g);
 
-    // Điều kiện dừng
     if (dist_to_goal < goal_tolerance_ && current_index_ > (path_points_.size() * 0.9)) {
         reached_goal_ = true;
         RCLCPP_WARN(this->get_logger(), "!!! GOAL REACHED (Dist: %.2f) !!!", dist_to_goal);
         return;
     }
 
-    // === TÍNH TOÁN ===
     double front_x = x + wheel_base_ * std::cos(yaw);
     double front_y = y + wheel_base_ * std::sin(yaw);
 
     double delta = computeSteering(front_x, front_y, yaw, v);
     double omega = (v / wheel_base_) * std::tan(delta);
-
-    // Publish
+    
     geometry_msgs::msg::TwistStamped cmd;
     cmd.header.stamp = this->now();
     cmd.header.frame_id = "base_link";

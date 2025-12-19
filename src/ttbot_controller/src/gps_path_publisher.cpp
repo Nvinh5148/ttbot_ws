@@ -11,7 +11,6 @@
 #include <cmath>
 #include <iomanip>
 
-// Bán kính trái đất (mét)
 const double EARTH_RADIUS = 6378137.0;
 
 class GpsPathPublisher : public rclcpp::Node
@@ -19,10 +18,8 @@ class GpsPathPublisher : public rclcpp::Node
 public:
     GpsPathPublisher() : Node("gps_path_publisher")
     {
-        // 1. Khai báo tham số
         this->declare_parameter("path_file", "path_gps.csv"); 
         this->declare_parameter("frame_id", "map");
-        // Tọa độ gốc (PHẢI TRÙNG VỚI FILE WORLD SDF)
         this->declare_parameter("origin_lat", 10.7769);
         this->declare_parameter("origin_lon", 106.7009);
 
@@ -31,18 +28,14 @@ public:
         origin_lat_ = this->get_parameter("origin_lat").as_double();
         origin_lon_ = this->get_parameter("origin_lon").as_double();
 
-        // 2. Publisher Path cho MPC
         path_pub_ = this->create_publisher<nav_msgs::msg::Path>("/mpc_path", 10);
         
-        // 3. Subscriber để nhận điểm click từ Rviz (Tạo path bằng cơm)
         click_sub_ = this->create_subscription<geometry_msgs::msg::PointStamped>(
             "/clicked_point", 10,
             std::bind(&GpsPathPublisher::clickCallback, this, std::placeholders::_1));
 
-        // Load path cũ nếu có
         loadAndConvertPath();
 
-        // Timer publish 1Hz
         timer_ = this->create_wall_timer(
             std::chrono::seconds(1),
             std::bind(&GpsPathPublisher::timerCallback, this));
@@ -51,7 +44,6 @@ public:
     }
 
 private:
-    // Hàm chuyển đổi: Lat/Lon -> X/Y (Mét)
     void latLonToXY(double lat, double lon, double &x, double &y)
     {
         double dLat = (lat - origin_lat_) * M_PI / 180.0;
@@ -62,7 +54,6 @@ private:
         y = EARTH_RADIUS * dLat;
     }
 
-    // Hàm chuyển đổi ngược: X/Y -> Lat/Lon (Để lưu file)
     void xyToLatLon(double x, double y, double &lat, double &lon)
     {
         double lat0_rad = origin_lat_ * M_PI / 180.0;
@@ -73,24 +64,20 @@ private:
         lon = origin_lon_ + (dLon * 180.0 / M_PI);
     }
 
-    // Xử lý khi click chuột trên Rviz
     void clickCallback(const geometry_msgs::msg::PointStamped::SharedPtr msg)
     {
-        // Thêm vào path hiện tại để hiển thị ngay
         geometry_msgs::msg::PoseStamped pose;
         pose.header = msg->header;
         pose.pose.position = msg->point;
         pose.pose.orientation.w = 1.0;
         path_msg_.poses.push_back(pose);
 
-        // Tính ra GPS và lưu vào file
         double lat, lon;
         xyToLatLon(msg->point.x, msg->point.y, lat, lon);
         savePointToFile(lat, lon);
         
         RCLCPP_INFO(this->get_logger(), "Added Point: X=%.2f Y=%.2f -> GPS: %.6f %.6f", msg->point.x, msg->point.y, lat, lon);
         
-        // Publish ngay lập tức
         path_msg_.header.stamp = this->now();
         path_pub_->publish(path_msg_);
     }

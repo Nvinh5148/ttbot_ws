@@ -7,12 +7,8 @@ import os
 
 def generate_launch_description():
     
-    # 1. KHAI BÁO NHẬN THAM SỐ TỪ BÊN NGOÀI
-    # Nếu không ai truyền vào thì mặc định là False (an toàn cho robot thật)
-    use_sim_time = LaunchConfiguration('use_sim_time', default='false')
 
-    # 2. SỬA LẠI BIẾN NÀY ĐỂ DÙNG THAM SỐ ĐỘNG
-    # Thay vì True/False cứng, ta đưa biến use_sim_time vào
+    use_sim_time = LaunchConfiguration('use_sim_time', default='false')
     common_params = [{"use_sim_time": use_sim_time}]
 
     static_transform_publisher = Node(
@@ -32,7 +28,7 @@ def generate_launch_description():
         output="screen",
         parameters=[
             os.path.join(get_package_share_directory("ttbot_localization"), "config", "ekf.yaml"),
-            common_params[0] # Merge dict use_sim_time vào
+            common_params[0] 
         ],
     )
 
@@ -43,7 +39,6 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
-        # 3. QUAN TRỌNG: PHẢI KHAI BÁO ARGUMENT Ở ĐÂY
         DeclareLaunchArgument(
             'use_sim_time',
             default_value='false',

@@ -22,9 +22,6 @@ include_directories(include)
 add_executable(imu_republisher src/imu_republisher.cpp)
 ament_target_dependencies(imu_republisher rclcpp sensor_msgs)
 
-
-
-
 install(TARGETS
   imu_republisher
   DESTINATION lib/${PROJECT_NAME}

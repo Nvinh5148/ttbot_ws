@@ -11,7 +11,6 @@
 #include <algorithm>
 #include <cmath>
 
-// Định nghĩa Controller
 class StanleyController : public rclcpp::Node
 {
 public:
@@ -19,42 +18,32 @@ public:
     ~StanleyController();
 
 private:
-    // ==== Callbacks ====
     void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg);
     void pathCallback(const nav_msgs::msg::Path::SharedPtr msg);
 
-    // ==== Logic Stanley ====
-    // Tìm điểm gần nhất trên quỹ đạo (tính từ trục trước xe)
     size_t findClosestPoint(double front_x, double front_y);
 
-    // Tính toán góc lái Stanley
     double computeSteering(double front_x, double front_y, double yaw, double v);
 
-    // Load path (nếu cần load từ file CSV như MPC cũ, hiện tại dùng topic)
     void loadPathFromCSV(); 
 
-    // ==== Parameters ====
-    double desired_speed_; // m/s
-    double wheel_base_;    // L (khoảng cách trục)
-    double max_steer_;     // Giới hạn góc lái (rad)
+    double desired_speed_; 
+    double wheel_base_;    
+    double max_steer_;     
     
-    // Stanley gains
-    double k_gain_;        // Gain hệ số lỗi ngang (Cross track error gain)
-    double k_soft_;        // Hệ số làm mềm (Softening gain)
+    double k_gain_;        
+    double k_soft_;        
 
-    // Goal parameters
     double goal_tolerance_;
     bool reached_goal_;
 
-    // ==== Path Data ====
     std::vector<std::pair<double, double>> path_points_;
     size_t current_index_;
     bool has_path_ = false;
 
-    // ==== ROS Interfaces ====
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
     rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr path_sub_;
     rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr cmd_pub_;
 };
 
-#endif // TTBOT_CONTROLLER_STANLEY_CONTROLLER_HPP_
+#endif

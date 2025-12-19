@@ -7,12 +7,8 @@
 
   <maintainer email="uylegia7@gmail.com">uylegia</maintainer>
   <license>TODO: License declaration</license>
-
-  <!-- build system -->
   <buildtool_depend>ament_cmake</buildtool_depend>
 
-  <!-- ========== C++ / ROS2 deps cho ackermann_controller ========== -->
-  <!-- dùng trong code C++: rclcpp, geometry_msgs, std_msgs -->
   <depend>rclcpp</depend>
   <depend>geometry_msgs</depend>
   <depend>std_msgs</depend>
@@ -24,11 +20,9 @@
   <depend>osqp</depend>   
   <depend>eigen</depend>
   
-  <!-- dùng trong launch của package controller -->
   <exec_depend>ros2launch</exec_depend>
   <exec_depend>controller_manager</exec_depend>
 
-  <!-- test -->
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 

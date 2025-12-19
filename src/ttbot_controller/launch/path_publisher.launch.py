@@ -7,7 +7,6 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
     
-    # Tên file mặc định
     path_file_arg = DeclareLaunchArgument(
         "path_file", default_value="path_8.csv",
         description="Name of the CSV file inside 'path' folder"
@@ -20,8 +19,8 @@ def generate_launch_description():
         output="screen",
         parameters=[{
             "path_file": LaunchConfiguration("path_file"),
-            "frame_id": "map",       # Hoặc 'odom' tùy hệ thống của bạn
-            "publish_rate": 1.0      # 1 Hz là đủ cho đường tĩnh
+            "frame_id": "map",       
+            "publish_rate": 1.0      
         }]
     )
 

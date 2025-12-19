@@ -1,14 +1,9 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
-  <!--
-    Macro: ttbot_gazebo
-    - ma sát, contact cho bánh
-    - plugin ros2_control cho Ignition / Gazebo Sim
-  -->
+
   <xacro:macro name="ttbot_gazebo" params="">
 
-    <!-- Hai bánh sau: ma sát cao hơn một chút -->
     <gazebo reference="rear_left_wheel">
       <mu1>2.0</mu1>
       <mu2>2.0</mu2>
@@ -27,7 +22,6 @@
       <maxVel>0.5</maxVel>
     </gazebo>
 
-    <!-- Hai bánh trước -->
     <gazebo reference="front_left_wheel">
       <mu1>1.5</mu1>
       <mu2>1.5</mu2>
@@ -46,9 +40,7 @@
       <maxVel>0.5</maxVel>
     </gazebo>
 
-    <!-- Plugin ROS 2 Control -->
     <gazebo>
-      <!-- ROS 2 Humble + Ignition (Fortress, Garden...) -->
       <xacro:if value="$(arg is_ignition)">
         <plugin filename="ign_ros2_control-system"
                 name="ign_ros2_control::IgnitionROS2ControlPlugin">
@@ -56,7 +48,6 @@
         </plugin>
       </xacro:if>
 
-      <!-- ROS 2 Iron+ + Gazebo Sim (gz) -->
       <xacro:unless value="$(arg is_ignition)">
         <plugin filename="gz_ros2_control-system"
                 name="gz_ros2_control::GazeboSimROS2ControlPlugin">

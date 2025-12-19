@@ -14,18 +14,14 @@ class PathPublisher : public rclcpp::Node
 public:
     PathPublisher() : Node("path_publisher")
     {
-        // 1. Khai báo tham số
-        this->declare_parameter("path_file", "path_u_to_S.csv"); // Tên file trong thư mục 'path'
-        this->declare_parameter("frame_id", "map"); // Frame tham chiếu (map hoặc odom)
-        this->declare_parameter("publish_rate", 1.0); // Hz (Path tĩnh không cần gửi nhanh)
+        this->declare_parameter("path_file", "path_u_to_S.csv"); 
+        this->declare_parameter("frame_id", "map"); 
+        this->declare_parameter("publish_rate", 1.0); 
 
-        // 2. Publisher topic /mpc_path
         path_pub_ = this->create_publisher<nav_msgs::msg::Path>("/mpc_path", 10);
 
-        // 3. Load Path
         loadPath();
 
-        // 4. Timer để publish định kỳ (giúp RViz hoặc Controller mới bật lên vẫn nhận được)
         double rate = this->get_parameter("publish_rate").as_double();
         timer_ = this->create_wall_timer(
             std::chrono::duration<double>(1.0 / rate),
@@ -42,7 +38,6 @@ private:
 
         path_msg_.header.frame_id = frame_id;
 
-        // --- Tìm đường dẫn tuyệt đối tới file CSV trong share directory ---
         std::string package_share_directory = ament_index_cpp::get_package_share_directory("ttbot_controller");
         std::string full_path = package_share_directory + "/path/" + filename;
 
@@ -69,7 +64,6 @@ private:
             RCLCPP_INFO(this->get_logger(), "Loaded custom path from: %s (%zu points)", full_path.c_str(), path_msg_.poses.size());
         } 
         else {
-            // --- Fallback: Tạo đường số 8 nếu không có file ---
             RCLCPP_WARN(this->get_logger(), "File not found: %s. Generating Figure-8 path.", full_path.c_str());
             generateFigure8Path();
         }
@@ -77,11 +71,10 @@ private:
 
     void generateFigure8Path()
     {
-        // Tạo 100 điểm hình số 8
         for (int i = 0; i < 200; ++i) {
             double t = 2.0 * M_PI * i / 200.0;
-            double x = 4.0 * std::sin(t);       // Rộng 4m
-            double y = 2.0 * std::sin(2.0 * t); // Cao 2m
+            double x = 4.0 * std::sin(t);       
+            double y = 2.0 * std::sin(2.0 * t); 
             addPointToPath(x, y);
         }
     }
@@ -94,7 +87,6 @@ private:
         pose.pose.position.y = y;
         pose.pose.position.z = 0.0;
         
-        // Orientation mặc định (có thể tính toán nếu cần, nhưng Controller tự tính heading rồi)
         pose.pose.orientation.w = 1.0; 
 
         path_msg_.poses.push_back(pose);
