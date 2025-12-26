@@ -23,12 +23,17 @@ def generate_launch_description():
         description='Enable QGroundControl Bridge'
     )
 
-    qgc_bridge_node = Node(
-        package='qgc_bridge',
-        executable='bridge_node',
-        name='qgc_bridge_node',
-        output='screen',
-        condition=IfCondition(run_qgc) 
+    qgc_bridge_node = TimerAction(
+        period=16.0, 
+        actions=[
+            Node(
+                package='qgc_bridge',
+                executable='bridge_node', 
+                name='qgc_bridge_node',
+                output='screen',
+                condition=IfCondition(run_qgc) 
+            )
+        ]
     )
 
 
@@ -84,18 +89,20 @@ def generate_launch_description():
         PythonLaunchDescriptionSource(os.path.join(pkg_gps_driver, 'launch', 'gps.launch.py')),
         launch_arguments={
             'port': gps_port,   
-            'baud': '57600',    
+            'baud': '38400',    
             'frame_id': 'gps_link'
         }.items()
     )
 
-    # micro_ros_agent = Node(
-    #     package='micro_ros_agent',
-    #     executable='micro_ros_agent',
-    #     name='micro_ros_agent',
-    #     output='screen',
-    #     arguments=['serial', '--dev', stm32_port, '-b', '115200']
-    # )
+    micro_ros_agent = Node(
+        package='micro_ros_agent',
+        executable='micro_ros_agent',
+        name='micro_ros_agent',
+        arguments=['serial', '--dev', '/dev/ttyUSB0', '-b', '115200'],
+        output='screen'
+    )
+
+
 
     ackermann_node = Node(
         package='ttbot_controller',
@@ -180,5 +187,6 @@ def generate_launch_description():
         # Algorithms layer
         localization_launch,
         path_pub_launch,
-        high_level_control
+        high_level_control,
+        micro_ros_agent
     ])

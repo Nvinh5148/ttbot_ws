@@ -21,13 +21,20 @@ def generate_launch_description():
         description='Enable QGroundControl Bridge'
     )
 
-    qgc_bridge_node = Node(
-        package='qgc_bridge',
-        executable='bridge_node',
-        name='qgc_bridge_node',
-        output='screen',
-        condition=IfCondition(run_qgc) 
+
+    qgc_bridge_node = TimerAction(
+        period=15.0, 
+        actions=[
+            Node(
+                package='qgc_bridge',
+                executable='bridge_node', 
+                name='qgc_bridge_node',
+                output='screen',
+                condition=IfCondition(run_qgc) 
+            )
+        ]
     )
+    
 
     run_joy = LaunchConfiguration('run_joy')
     arg_run_joy = DeclareLaunchArgument(

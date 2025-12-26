@@ -7,8 +7,7 @@ import rclpy
 from rclpy.node import Node
 from pymavlink import mavutil
 from nav_msgs.msg import Path, Odometry
-from geometry_msgs.msg import PoseStamped
-from sensor_msgs.msg import NavSatFix
+from geometry_msgs.msg import PoseStamped, Vector3 # [THÊM Vector3]from sensor_msgs.msg import NavSatFix
 from sensor_msgs.msg import NavSatFix, Imu # [NEW] Thêm Imu msg
 from std_msgs.msg import Float32MultiArray, Bool
 import math
@@ -34,9 +33,9 @@ class QGCBridge(Node):
 
         # --- ROS 2 PUBLISHERS ---
         self.path_pub = self.create_publisher(Path, '/mpc_path', 10)
-        self.params_pub = self.create_publisher(Float32MultiArray, '/tuning/pid_params', 10)
+        self.pid_pub = self.create_publisher(Float32MultiArray, '/pid_all_tuning', 10)
         self.arm_pub = self.create_publisher(Bool, '/system/armed', 10)
-
+        
         # --- ROS 2 SUBSCRIBERS ---
         self.create_subscription(NavSatFix, '/gps/fix', self.gps_callback, 10)
         self.create_subscription(Odometry, '/odom', self.odom_callback, 10)
@@ -60,7 +59,13 @@ class QGCBridge(Node):
             'PILOT_THR_BHV': 0.0, 
             'FS_GCS_ENABLE': 0.0, 'FS_OPTIONS': 0.0, 'FS_GCS_TIMEOUT': 5.0, 'FS_ACTION': 0.0,
             'ARMING_CHECK': 0.0, # Tắt check để luôn Ready
-            'VEL_KP': 1.5, 'VEL_KI': 0.01, 'VEL_KD': 0.5, 'MAX_SPEED': 2.0
+            # --- BỘ 1: VELOCITY MOTOR 1 ---
+            'VEL1_KP': 1.5, 'VEL1_KI': 0.01, 'VEL1_KD': 0.5,
+            # --- BỘ 2: VELOCITY MOTOR 2 ---
+            'VEL2_KP': 1.5, 'VEL2_KI': 0.01, 'VEL2_KD': 0.5,
+            # --- BỘ 3: POSITION CONTROL ---
+            'POS_KP':  0.8, 'POS_KI':  0.00, 'POS_KD':  0.05,
+            'MAX_SPEED': 2.0
         }
         self.param_keys = list(self.param_dict.keys())
 
@@ -73,10 +78,23 @@ class QGCBridge(Node):
         self.create_timer(0.01, self.read_mavlink_loop)  # Xử lý tin nhắn đến
         self.create_timer(1.0, self.send_sys_status)     # 1Hz Status
         self.create_timer(2.0, self.send_autopilot_version) # 0.5Hz Gửi định danh (QUAN TRỌNG)
-
+        # [THÊM] Gởi PID mặc định xuống ROS ngay khi khởi động
+        self.publish_pid_to_ros()
     # [HÀM FIX TRÀN SỐ]
     def get_boot_time(self):
         return int((time.time() - self.boot_time) * 1000)
+    
+    # [UPDATED] Hàm gửi toàn bộ 3 bộ PID (9 số)
+    def publish_pid_to_ros(self):
+        msg = Float32MultiArray()
+    # Thứ tự gửi: [V1_P, V1_I, V1_D,  V2_P, V2_I, V2_D,  POS_P, POS_I, POS_D]
+        msg.data = [
+            float(self.param_dict['VEL1_KP']), float(self.param_dict['VEL1_KI']), float(self.param_dict['VEL1_KD']),
+            float(self.param_dict['VEL2_KP']), float(self.param_dict['VEL2_KI']), float(self.param_dict['VEL2_KD']),
+            float(self.param_dict['POS_KP']),  float(self.param_dict['POS_KI']),  float(self.param_dict['POS_KD'])
+        ]
+        self.pid_pub.publish(msg)
+        self.get_logger().info(">>> SENT TUNING PACKET (Vel1, Vel2, Pos) to Micro-ROS")
 
     def send_heartbeat(self):
         # Base mode: MANUAL + ARMED/DISARMED
@@ -220,6 +238,21 @@ class QGCBridge(Node):
             if not msg: break
             
             msg_type = msg.get_type()
+            # --- [ADDED] XỬ LÝ PARAM_SET TỪ QGC ---
+            if msg_type == 'PARAM_SET':
+                param_id = msg.param_id
+                param_value = msg.param_value
+                if param_id in self.param_dict:
+                    self.param_dict[param_id] = param_value
+                    # Gửi ACK lại cho QGC
+                    idx = self.param_keys.index(param_id)
+                    self.mav.mav.param_value_send(param_id.encode('utf-8'), param_value, mavutil.mavlink.MAV_PARAM_TYPE_REAL32, len(self.param_keys), idx)
+                    self.get_logger().info(f"QGC SET PARAM: {param_id} = {param_value}")
+                    # [UPDATED] Kiểm tra xem tham số vừa chỉnh có thuộc về 3 bộ PID không
+                # Các tiền tố cần check: VEL1, VEL2, POS
+                if any(prefix in param_id for prefix in ['VEL1_', 'VEL2_', 'POS_']):
+                    self.publish_pid_to_ros()
+                continue
 
             # --- IDENTIFICATION ---
             if msg_type == 'COMMAND_LONG' and msg.command == 520:
