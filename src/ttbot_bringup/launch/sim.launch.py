@@ -14,6 +14,9 @@ def generate_launch_description():
     pkg_controller = get_package_share_directory('ttbot_controller')
 
 
+    use_sim_time = LaunchConfiguration('use_sim_time')
+    arg_sim_time = DeclareLaunchArgument('use_sim_time', default_value='true')
+
     run_qgc = LaunchConfiguration('run_qgc')
     arg_run_qgc = DeclareLaunchArgument(
         'run_qgc', 
@@ -26,11 +29,17 @@ def generate_launch_description():
         period=15.0, 
         actions=[
             Node(
-                package='qgc_bridge',
-                executable='bridge_node', 
+                package='qgc_bridge_cpp',      # <--- [SỬA] Tên gói C++ mới
+                executable='qgc_bridge_node',
                 name='qgc_bridge_node',
                 output='screen',
-                condition=IfCondition(run_qgc) 
+                condition=IfCondition(run_qgc),
+                # [THÊM MỚI] --- THAM SỐ CẤU HÌNH ---
+                parameters=[{  # Đồng bộ giờ
+                    'use_sim_time': use_sim_time,
+                    'heading_offset_deg': 90.0      # Chỉnh hướng: 90.0 cho Gazebo
+                }]
+                # -----------------------------------
             )
         ]
     )
@@ -149,6 +158,7 @@ def generate_launch_description():
         arguments=['-d', os.path.join(pkg_description, 'rviz', 'display.rviz')],
         parameters=[{'use_sim_time': use_sim_time}]
     )
+    
 
     return LaunchDescription([
         arg_sim_time,

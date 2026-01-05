@@ -23,7 +23,7 @@ class QGCBridge(Node):
 
         self.sys_id = 1
         self.comp_id = 1
-        self.connection_string = 'udpout:localhost:14550' 
+        self.connection_string = 'udpin:0.0.0.0:14550' 
         self.heading_offset_rad = math.pi / -2
         
         self.mav = mavutil.mavlink_connection(
@@ -182,7 +182,7 @@ class QGCBridge(Node):
             self.mav.mav.home_position_send(
                 int(msg.latitude * 1e7), int(msg.longitude * 1e7), int(msg.altitude * 1000),
                 0, 0, 0, [0,0,0,0], 0, 0, 0)
-
+            
         time_since_last_odom = time.time() - self.last_odom_time
         if msg.status.status >= 0 and time_since_last_odom > 1.0:
             self.mav.mav.global_position_int_send(
@@ -343,4 +343,4 @@ def main(args=None):
         rclpy.shutdown()
 
 if __name__ == '__main__':
-    main() 
+    main()

@@ -15,6 +15,9 @@ def generate_launch_description():
     pkg_controller = get_package_share_directory('ttbot_controller')
     pkg_imu_driver = get_package_share_directory('adis16488_driver')
     pkg_gps_driver = get_package_share_directory('ublox_driver') 
+    
+    use_sim_time = LaunchConfiguration('use_sim_time')
+    arg_sim_time = DeclareLaunchArgument('use_sim_time', default_value='false') 
 
     run_qgc = LaunchConfiguration('run_qgc')
     arg_run_qgc = DeclareLaunchArgument(
@@ -27,11 +30,17 @@ def generate_launch_description():
         period=16.0, 
         actions=[
             Node(
-                package='qgc_bridge',
-                executable='bridge_node', 
+                package='qgc_bridge_cpp',      # Đã sửa tên gói
+                executable='qgc_bridge_node',  # Đã sửa tên file chạy
                 name='qgc_bridge_node',
                 output='screen',
-                condition=IfCondition(run_qgc) 
+                condition=IfCondition(run_qgc),
+                parameters=[{
+                    'use_sim_time': use_sim_time,
+                    # Với thực tế, ta thường bắt đầu từ 0.0. 
+                    # Ra sân nếu thấy lệch 90 độ thì sửa số này sau.
+                    'heading_offset_deg': 0.0     
+                }]
             )
         ]
     )

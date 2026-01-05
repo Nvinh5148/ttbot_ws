@@ -25,11 +25,11 @@ def generate_launch_description():
     goal_tol_arg      = DeclareLaunchArgument("goal_tolerance", default_value="0.3")
 
     # 4. MPC Weights & Horizon
-    Np_arg      = DeclareLaunchArgument("N_p", default_value="15", description="Prediction Horizon")
+    Np_arg      = DeclareLaunchArgument("N_p", default_value="30", description="Prediction Horizon")
     dt_mpc_arg  = DeclareLaunchArgument("dt_mpc", default_value="0.1", description="Time step")
-    Q_ey_arg    = DeclareLaunchArgument("Q_ey", default_value="15.0", description="Lateral error weight")
-    Q_epsi_arg  = DeclareLaunchArgument("Q_epsi", default_value="10.0", description="Heading error weight")
-    R_delta_arg = DeclareLaunchArgument("R_delta", default_value="5.0", description="Steer effort weight")
+    Q_ey_arg    = DeclareLaunchArgument("Q_ey", default_value="8.0", description="Lateral error weight")
+    Q_epsi_arg  = DeclareLaunchArgument("Q_epsi", default_value="5.0", description="Heading error weight")
+    R_delta_arg = DeclareLaunchArgument("R_delta", default_value="200.0", description="Steer effort weight")
 
     # 5. Node Definition
     mpc_node = Node(
