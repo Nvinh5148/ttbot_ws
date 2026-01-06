@@ -9,7 +9,7 @@ StanleyController::StanleyController()
 : Node("stanley_controller")
 {
     this->declare_parameter("desired_speed", 1.5);
-    this->declare_parameter("wheel_base", 0.8);
+    this->declare_parameter("wheel_base", 0.65);
     this->declare_parameter("max_steer_deg", 30.0);
     this->declare_parameter("goal_tolerance", 0.3);
     this->declare_parameter("k_gain", 2.0);  
@@ -128,9 +128,9 @@ double StanleyController::computeSteering(double front_x, double front_y, double
 
     double delta_clamped = std::clamp(delta_raw, -max_steer_, max_steer_);
 
-    RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 500,
-        "Stanley Log | idx: %zu | CTE: %.3f | Theta_e: %.2f | Raw: %.1f deg -> Limit: %.1f",
-        idx, error_front_axle, theta_e, rad2deg(delta_raw), rad2deg(delta_clamped));
+    // RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 500,
+    //     "Stanley Log | idx: %zu | CTE: %.3f | Theta_e: %.2f | Raw: %.1f deg -> Limit: %.1f",
+    //     idx, error_front_axle, theta_e, rad2deg(delta_raw), rad2deg(delta_clamped));
 
 
     // Publish Cross-track Error

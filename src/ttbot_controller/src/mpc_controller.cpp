@@ -12,7 +12,7 @@ MpcController::MpcController()
 {
     // 1. Declare & Load Parameters
     this->declare_parameter("desired_speed", 1.5);
-    this->declare_parameter("wheel_base", 0.8);
+    this->declare_parameter("wheel_base", 0.65);
     this->declare_parameter("max_steer_deg", 30.0);
     this->declare_parameter("goal_tolerance", 0.3);
 
@@ -391,9 +391,9 @@ void MpcController::odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
     double omega = (v_ref / wheel_base_) * std::tan(delta);
     omega = std::clamp(omega, -max_omega_, max_omega_);
 
-    RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 500,
-        "MPC LOG | idx: %zu | ey: %.3f | epsi: %.3f | Delta: %.1f deg",
-        idx, ey, epsi, rad2deg(delta));
+    // RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 500,
+    //     "MPC LOG | idx: %zu | ey: %.3f | epsi: %.3f | Delta: %.1f deg",
+    //     idx, ey, epsi, rad2deg(delta));
 
     geometry_msgs::msg::TwistStamped cmd;
     cmd.header.stamp = this->now();
