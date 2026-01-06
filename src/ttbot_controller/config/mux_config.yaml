@@ -1,0 +1,16 @@
+twist_mux:
+  ros__parameters:
+    topics:
+      navigation:       # Key định danh (thay vì dùng - name: navigation)
+        topic: mpc_cmd_vel
+        timeout: 0.5
+        priority: 10
+      joystick:         # Key định danh
+        topic: joy_cmd_vel
+        timeout: 0.5
+        priority: 100
+    locks:
+      e_stop:
+        topic: e_stop
+        timeout: 0.0
+        priority: 255

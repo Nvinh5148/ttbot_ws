@@ -117,6 +117,26 @@ install(
 )
 
 
+add_executable(stamped_twist_mux src/stamped_twist_mux.cpp)
+ament_target_dependencies(stamped_twist_mux 
+  rclcpp 
+  geometry_msgs 
+  nav_msgs
+)
+
+install(TARGETS
+  stamped_twist_mux
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+
+
+
+
+
+
+
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   set(ament_cmake_copyright_FOUND TRUE)
