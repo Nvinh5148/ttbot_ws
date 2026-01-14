@@ -2,13 +2,13 @@ navsat_transform_node:
   ros__parameters:
     frequency: 30.0
     #CHINH CAI NAY THEO VI TRI DIA LY
-    magnetic_declination_radians: 0.0
+    magnetic_declination_radians: -0.00628
     yaw_offset: 0.0
     zero_altitude: true
     broadcast_cartesian_transform: false
     publish_filtered_gps: true
     use_odometry_yaw: false  
-    delay: 0.0
+    delay: 3.0
 
 ekf_global_node:
   ros__parameters:

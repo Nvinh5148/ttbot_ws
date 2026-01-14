@@ -43,6 +43,8 @@ public:
     }
 
     // 3. Tạo Publishers
+    // [FIX LỖI QoS]: Dùng số 10 (Reliable) thay vì SensorDataQoS (Best Effort)
+    // Để tương thích với Rviz và các node mặc định khác.
     imu_pub_ = this->create_publisher<sensor_msgs::msg::Imu>("imu/data_raw", 10);
     mag_pub_ = this->create_publisher<sensor_msgs::msg::MagneticField>("imu/mag", 10);
 
@@ -118,12 +120,10 @@ private:
   void process_buffer()
   {
     size_t pos;
-    // Tách dòng dựa trên ký tự \r hoặc \n tùy firmware IMU
     while ((pos = serial_buffer_.find('\r')) != std::string::npos) {
       std::string line = serial_buffer_.substr(0, pos);
       serial_buffer_.erase(0, pos + 1);
 
-      // Lọc bỏ ký tự \n ở đầu nếu có
       size_t start_pos = line.find('\n');
       if (start_pos != std::string::npos) {
         std::string data_str = line.substr(start_pos + 1);
@@ -156,27 +156,31 @@ private:
       const double DEG_TO_RAD = M_PI / 180.0;
       const double G_TO_MS2   = 9.80665;
 
-      // --- [FIX: Đảo dấu trục Z] ---
+      // ==========================================
+      // [FIX CHIỀU]: Đảo dấu (-1.0) cho khớp hệ tọa độ ROS
+      // ==========================================
+      
+      // 1. Góc Roll, Pitch, Yaw
       double roll  = values[0] * 0.001 * DEG_TO_RAD;
-      double pitch = values[1] * 0.001 * DEG_TO_RAD;
-      // Nhân -1.0 để đúng chuẩn ROS (Left turn = Positive)
+      double pitch = -1.0 * values[1] * 0.001 * DEG_TO_RAD;
       double yaw   = -1.0 * values[2] * 0.001 * DEG_TO_RAD; 
 
       tf2::Quaternion q;
       q.setRPY(roll, pitch, yaw);
       imu_msg.orientation = tf2::toMsg(q);
 
+      // 2. Vận tốc góc (Angular Velocity)
       imu_msg.angular_velocity.x = values[3] * 0.001 * DEG_TO_RAD;
-      imu_msg.angular_velocity.y = values[4] * 0.001 * DEG_TO_RAD;
-      // Nhân -1.0 cho vận tốc góc Z
+      imu_msg.angular_velocity.y = -1.0 * values[4] * 0.001 * DEG_TO_RAD;
       imu_msg.angular_velocity.z = -1.0 * values[5] * 0.001 * DEG_TO_RAD;
-      // ----------------------------
 
+      // 3. Gia tốc tuyến tính (Linear Acceleration)
+      // Giữ nguyên dương nếu Z hướng lên trời (~9.8)
       imu_msg.linear_acceleration.x = values[6] * 0.0001 * G_TO_MS2;
       imu_msg.linear_acceleration.y = values[7] * 0.0001 * G_TO_MS2;
       imu_msg.linear_acceleration.z = values[8] * 0.0001 * G_TO_MS2;
 
-      // Set covariance (Giả định)
+      // Set covariance
       for (int i = 0; i < 9; i++) {
         imu_msg.orientation_covariance[i] = 0.0;
         imu_msg.angular_velocity_covariance[i] = 0.0;
@@ -185,6 +189,14 @@ private:
       imu_msg.orientation_covariance[0] = 0.01;
       imu_msg.orientation_covariance[4] = 0.01;
       imu_msg.orientation_covariance[8] = 0.01;
+      
+      imu_msg.angular_velocity_covariance[0] = 0.0001;
+      imu_msg.angular_velocity_covariance[4] = 0.0001;
+      imu_msg.angular_velocity_covariance[8] = 0.0001;
+
+      imu_msg.linear_acceleration_covariance[0] = 0.001;
+      imu_msg.linear_acceleration_covariance[4] = 0.001;
+      imu_msg.linear_acceleration_covariance[8] = 0.001;
 
       imu_pub_->publish(imu_msg);
 
@@ -195,7 +207,7 @@ private:
 
       mag_msg.magnetic_field.x = values[9]  * UNIT_TO_TESLA;
       mag_msg.magnetic_field.y = values[10] * UNIT_TO_TESLA;
-      mag_msg.magnetic_field.z = -1.0 * values[11] * UNIT_TO_TESLA; // Giữ nguyên -1.0 nếu trước đó đã đúng
+      mag_msg.magnetic_field.z = -1.0 * values[11] * UNIT_TO_TESLA; 
 
       for (int i = 0; i < 9; i++) mag_msg.magnetic_field_covariance[i] = 0.0;
       mag_msg.magnetic_field_covariance[0] = 1e-8;
