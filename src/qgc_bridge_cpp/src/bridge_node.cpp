@@ -68,7 +68,7 @@ public:
             "/gps/fix", 10, std::bind(&QGCBridgeNode::gps_callback, this, std::placeholders::_1));
         
         odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
-            "/odom", 10, std::bind(&QGCBridgeNode::odom_callback, this, std::placeholders::_1));
+            "/odometry/global", 10, std::bind(&QGCBridgeNode::odom_callback, this, std::placeholders::_1));
 
         imu_sub_ = this->create_subscription<sensor_msgs::msg::Imu>(
             "/imu/data_filtered", qos_sensor, std::bind(&QGCBridgeNode::imu_callback, this, std::placeholders::_1));
@@ -423,9 +423,11 @@ private:
     }
 
     void odom_callback(const nav_msgs::msg::Odometry::SharedPtr msg) {
+        // Chỉ xử lý khi đã biết điểm Home (để tính offset Lat/Lon)
         if (!home_set_) return;
 
-        // Chuyển đổi Local XY (ROS) -> GPS (Lat/Lon)
+        // --- 1. Chuyển đổi Vị trí (X, Y map -> Lat, Lon) ---
+        // Giả định: (0,0) của map trùng với vị trí Home (origin_lat_, origin_lon_)
         double x = msg->pose.pose.position.x;
         double y = msg->pose.pose.position.y;
 
@@ -436,20 +438,41 @@ private:
         double current_lat = origin_lat_ + (dLat * 180.0 / M_PI);
         double current_lon = origin_lon_ + (dLon * 180.0 / M_PI);
 
-        // Lấy Heading (nếu chưa có từ IMU thì lấy từ Odom)
-        uint16_t heading_cdeg = 0;
-        if (has_orientation_) {
-            double deg = yaw_ * 180.0 / M_PI;
-            if (deg < 0) deg += 360.0;
-            heading_cdeg = (uint16_t)(deg * 100);
-        }
+        // --- 2. Lấy Heading từ /odometry/global ---
+        // EKF Global thường trả về hướng chuẩn trong frame Map/Odom
+        double qx = msg->pose.pose.orientation.x;
+        double qy = msg->pose.pose.orientation.y;
+        double qz = msg->pose.pose.orientation.z;
+        double qw = msg->pose.pose.orientation.w;
 
+        // Quaternion -> Yaw
+        double siny_cosp = 2 * (qw * qz + qx * qy);
+        double cosy_cosp = 1 - 2 * (qy * qy + qz * qz);
+        double odom_yaw = std::atan2(siny_cosp, cosy_cosp);
+
+        // Xử lý offset nếu hệ trục tọa độ lệch pha (thường ENU là chuẩn, không cần chỉnh nhiều)
+        // Nếu mũi tên trên QGC xoay không đúng, hãy thử đổi dấu: -odom_yaw
+        double final_yaw = -odom_yaw + heading_offset_rad_; 
+
+        // Chuẩn hóa -PI ... +PI
+        while (final_yaw > M_PI) final_yaw -= 2 * M_PI;
+        while (final_yaw < -M_PI) final_yaw += 2 * M_PI;
+
+        // Đổi sang độ (0-360) cho MAVLink
+        double deg = final_yaw * 180.0 / M_PI;
+        if (deg < 0) deg += 360.0;
+        uint16_t heading_cdeg = (uint16_t)(deg * 100);
+
+        // --- 3. Gửi tin nhắn MAVLink ---
         mavlink_message_t mav_msg;
         mavlink_msg_global_position_int_pack(sys_id_, comp_id_, &mav_msg,
             get_boot_time_ms(),
             (int32_t)(current_lat * 1e7), (int32_t)(current_lon * 1e7),
-            10000, 10000, // Alt (giả lập 10m)
-            (int16_t)(msg->twist.twist.linear.x * 100), (int16_t)(msg->twist.twist.linear.y * 100), 0,
+            (int32_t)(msg->pose.pose.position.z * 1000) + 10000, // Lấy độ cao từ Odom nếu có
+            10000, // Relative Alt
+            (int16_t)(msg->twist.twist.linear.x * 100), 
+            (int16_t)(msg->twist.twist.linear.y * 100), 
+            (int16_t)(msg->twist.twist.linear.z * 100),
             heading_cdeg);
         send_mavlink_message(&mav_msg);
     }

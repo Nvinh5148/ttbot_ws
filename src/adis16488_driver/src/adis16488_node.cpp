@@ -29,10 +29,21 @@ public:
     this->declare_parameter("port", "/dev/ttbot_imu");
     this->declare_parameter("baudrate", 460800);
     this->declare_parameter("frame_id", "imu_link");
+    
+    // --- THÊM: Tham số giới hạn tần số ---
+    this->declare_parameter("publish_rate", 50.0); // Mặc định 50Hz (Đủ cho EKF)
 
     std::string port = this->get_parameter("port").as_string();
     int baudrate = this->get_parameter("baudrate").as_int();
     frame_id_ = this->get_parameter("frame_id").as_string();
+    
+    // Tính toán khoảng thời gian tối thiểu giữa 2 lần publish
+    double rate = this->get_parameter("publish_rate").as_double();
+    if (rate <= 0.0) rate = 50.0;
+    min_publish_interval_ = 1.0 / rate;
+    last_publish_time_ = this->now();
+
+    RCLCPP_INFO(this->get_logger(), "Target Publish Rate: %.1f Hz", rate);
 
     // 2. Kết nối Serial
     if (open_serial_port(port, baudrate)) {
@@ -42,13 +53,12 @@ public:
       return; 
     }
 
-    // 3. Tạo Publishers
-    // [FIX LỖI QoS]: Dùng số 10 (Reliable) thay vì SensorDataQoS (Best Effort)
-    // Để tương thích với Rviz và các node mặc định khác.
+    // 3. Tạo Publishers (Reliable QoS)
     imu_pub_ = this->create_publisher<sensor_msgs::msg::Imu>("imu/data_raw", 10);
     mag_pub_ = this->create_publisher<sensor_msgs::msg::MagneticField>("imu/mag", 10);
 
-    // 4. Timer đọc dữ liệu (200Hz)
+    // 4. Timer đọc dữ liệu (Vẫn đọc nhanh để vét sạch buffer Serial)
+    // Giữ nguyên 5ms (200Hz) để đọc buffer liên tục, tránh tràn
     timer_ = this->create_wall_timer(
       5ms, std::bind(&Adis16488Node::timer_callback, this));
   }
@@ -68,6 +78,10 @@ private:
   rclcpp::TimerBase::SharedPtr timer_;
   std::string serial_buffer_;
 
+  // --- THÊM: Biến kiểm soát tần số ---
+  rclcpp::Time last_publish_time_;
+  double min_publish_interval_;
+
   bool open_serial_port(const std::string &port, int baudrate)
   {
     serial_fd_ = open(port.c_str(), O_RDWR | O_NOCTTY | O_NDELAY);
@@ -80,7 +94,7 @@ private:
     switch (baudrate) {
       case 115200: speed = B115200; break;
       case 230400: speed = B230400; break;
-      case 460800: speed = B460800; break; // Default
+      case 460800: speed = B460800; break; 
       case 921600: speed = B921600; break;
       default: speed = B460800;
     }
@@ -136,6 +150,16 @@ private:
 
   void parse_and_publish(const std::string &line)
   {
+    // --- LOGIC GIỚI HẠN TẦN SỐ (THROTTLE) ---
+    // Kiểm tra: Nếu chưa đủ thời gian kể từ lần gửi trước -> Bỏ qua packet này
+    rclcpp::Time now = this->now();
+    double time_diff = (now - last_publish_time_).seconds();
+
+    if (time_diff < min_publish_interval_) {
+        return; // Skip, không publish để giảm tải
+    }
+
+    // Nếu đủ thời gian thì tiếp tục xử lý
     std::stringstream ss(line);
     std::string segment;
     std::vector<double> values;
@@ -149,17 +173,16 @@ private:
     }
 
     if (values.size() >= 12) {
+      // Cập nhật thời gian gửi lần cuối
+      last_publish_time_ = now;
+
       auto imu_msg = sensor_msgs::msg::Imu();
-      imu_msg.header.stamp = this->now();
+      imu_msg.header.stamp = now;
       imu_msg.header.frame_id = frame_id_;
 
       const double DEG_TO_RAD = M_PI / 180.0;
       const double G_TO_MS2   = 9.80665;
 
-      // ==========================================
-      // [FIX CHIỀU]: Đảo dấu (-1.0) cho khớp hệ tọa độ ROS
-      // ==========================================
-      
       // 1. Góc Roll, Pitch, Yaw
       double roll  = values[0] * 0.001 * DEG_TO_RAD;
       double pitch = -1.0 * values[1] * 0.001 * DEG_TO_RAD;
@@ -169,18 +192,17 @@ private:
       q.setRPY(roll, pitch, yaw);
       imu_msg.orientation = tf2::toMsg(q);
 
-      // 2. Vận tốc góc (Angular Velocity)
+      // 2. Vận tốc góc
       imu_msg.angular_velocity.x = values[3] * 0.001 * DEG_TO_RAD;
       imu_msg.angular_velocity.y = -1.0 * values[4] * 0.001 * DEG_TO_RAD;
       imu_msg.angular_velocity.z = -1.0 * values[5] * 0.001 * DEG_TO_RAD;
 
-      // 3. Gia tốc tuyến tính (Linear Acceleration)
-      // Giữ nguyên dương nếu Z hướng lên trời (~9.8)
+      // 3. Gia tốc tuyến tính
       imu_msg.linear_acceleration.x = values[6] * 0.0001 * G_TO_MS2;
       imu_msg.linear_acceleration.y = values[7] * 0.0001 * G_TO_MS2;
       imu_msg.linear_acceleration.z = values[8] * 0.0001 * G_TO_MS2;
 
-      // Set covariance
+      // Set covariance (Giữ nguyên)
       for (int i = 0; i < 9; i++) {
         imu_msg.orientation_covariance[i] = 0.0;
         imu_msg.angular_velocity_covariance[i] = 0.0;

@@ -24,7 +24,9 @@ def generate_launch_description():
             parameters=[
                 {'port': imu_port},       
                 {'baudrate': 460800},
-                {'frame_id': 'imu_link'}
+                {'frame_id': 'imu_link'},
+                # --- QUAN TRỌNG: Giới hạn tần số ở 50Hz ---
+                {'publish_rate': 50.0} 
             ]
         ),
 
