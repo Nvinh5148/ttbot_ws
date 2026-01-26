@@ -72,12 +72,14 @@ def generate_launch_description():
             "/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock",
             "/gps/fix@sensor_msgs/msg/NavSatFix[gz.msgs.NavSat",
             "/imu@sensor_msgs/msg/Imu[gz.msgs.IMU",
-            "/world/gps_world/model/ttbot/joint_state@sensor_msgs/msg/JointState[gz.msgs.Model"
+            "/world/gps_world/model/ttbot/joint_state@sensor_msgs/msg/JointState[gz.msgs.Model",
+            "/velodyne_points@sensor_msgs/msg/LaserScan[ignition.msgs.LaserScan"
         ],
         remappings=[
             ('/gps/fix', '/gps/fix'),
             ('/imu', '/imu/out'),
-            ('/world/gps_world/model/ttbot/joint_state', '/joint_states')
+            ('/world/gps_world/model/ttbot/joint_state', '/joint_states'),
+            ('/velodyne_points', '/velodyne_points')
         ]
     )
 

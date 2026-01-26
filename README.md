@@ -192,3 +192,15 @@ ros2 run tf2_ros tf2_echo map base_link
 
 
 nano ~/.bashrc
+
+xsen
+
+git clone -b ros2 https://github.com/xsenssupport/Xsens_MTi_ROS_Driver_and_Ntrip_Client.git
+sudo apt install ros-humble-mavros-msgs
+
+
+-tim extrinsce
+-build fast lio 
+- anh dat huong dan ve map 
+
+https://github.com/hku-mars/FAST_LIO/blob/ROS2/config/velodyne.yaml

@@ -66,7 +66,6 @@ def generate_launch_description():
         description='Set to true to publish path from CSV'
     )
 
-    use_sim_time = LaunchConfiguration('use_sim_time')
     arg_sim_time = DeclareLaunchArgument('use_sim_time', default_value='true')
 
     run_rviz = LaunchConfiguration('run_rviz')
