@@ -204,3 +204,20 @@ sudo apt install ros-humble-mavros-msgs
 - anh dat huong dan ve map 
 
 https://github.com/hku-mars/FAST_LIO/blob/ROS2/config/velodyne.yaml
+ 
+
+tra lai cac frame , body , camera_init sang base_link hoac gi do 
+
+
+sua config rviz 
+
+check lai lidar (10hz)  hien tai dang 6hz
+
+fuse enc 
+fus2 enc va rtk (ref)
+
+TF camera_init -> base_link 
+
+mai mua truot , bulong , oc , ke goc M5
+
+Set up rviz lai ( trong fast _ lio)
