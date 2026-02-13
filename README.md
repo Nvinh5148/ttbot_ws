@@ -257,7 +257,7 @@ config file preprocess.cpp
 
   
   cach chay : 
-   
+```bash   
 Terminal1 : ros2 launch ttbot_bringup sim.launch.py
 
 Terminal2 : ros2 launch fast_lio mapping.launch.py config_file:=velodyne_sim.yaml use_sim_time:=true
@@ -272,4 +272,6 @@ ros2 launch pointcloud_to_grid grid_trajectory.launch.py topic:=/cloud_registere
 
 tat publish tf camera_init va body , 
 chay lenh sau de keo 2 tf trung tam 
+
 ros2 run tf2_ros static_transform_publisher 0 0 0 0 0 0 odom camera_init
+```
