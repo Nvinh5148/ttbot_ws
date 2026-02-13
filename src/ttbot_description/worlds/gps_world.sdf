@@ -48,6 +48,13 @@
       <name>campus</name>
       <pose>0 0 0 0 0 0</pose>
     </include>
+    <!-- <include>
+      <uri>
+        https://fuel.gazebosim.org/1.0/zaidammag/models/baylands_terrain
+      </uri>
+      <name>baylands_terrain</name>
+      <pose>0 0 0 0 0 0</pose>
+    </include> -->
 
     <spherical_coordinates>
       <surface_model>EARTH_WGS84</surface_model>

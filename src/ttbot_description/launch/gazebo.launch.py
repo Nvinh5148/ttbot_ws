@@ -74,7 +74,7 @@ def generate_launch_description():
             # --- SỬA TỌA ĐỘ Ở ĐÂY ---
             "-x", "2.0",  # Dịch ra 2 mét
             "-y", "2.0",  # Dịch sang 2 mét
-            "-z", "0.5"   # Thả từ độ cao 0.5m (để tránh kẹt bánh vào đất)
+            "-z", "5"   # Thả từ độ cao 0.5m (để tránh kẹt bánh vào đất)
         ],
     )
 

@@ -88,6 +88,22 @@ ekf_filter_node:
       odom0_differential: true
       odom0_pose_use_child_frame: false
 
+      # ---------------------------------------------------------
+      # INPUT 3: FAST-LIO (Lidar Odometry) - Topic: /Odometry
+      # ---------------------------------------------------------
+      odom1: /Odometry   # <-- Đây là topic Output của FAST-LIO
+      
+      # Chiến thuật: FAST-LIO rất chính xác, ta dùng nó để "neo" vị trí robot lại, chống trôi cho bánh xe.
+      # Ta tin VỊ TRÍ (X, Y, Z) và GÓC (Roll, Pitch, Yaw) của nó.
+      odom1_config: [true,  true,  true,  # X, Y, Z
+                    true,  true,  true,  # Roll, Pitch, Yaw
+                    false, false, false,
+                    false, false, false,
+                    false, false, false]
+                    
+      odom1_differential: false 
+      odom1_queue_size: 10
+
       # [ADVANCED] The process noise covariance matrix can be difficult to tune, and can vary for each application, so it is
       # exposed as a configuration parameter. This matrix represents the noise we add to the total error after each
       # prediction step. The better the omnidirectional motion model matches your system, the smaller these values can be.
