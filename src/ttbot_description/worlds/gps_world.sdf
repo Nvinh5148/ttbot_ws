@@ -46,7 +46,7 @@
         https://fuel.gazebosim.org/1.0/hujp/models/Campus
       </uri>
       <name>campus</name>
-      <pose>0 0 0 0 0 0</pose>
+      <pose>-3.24 -53.09 0 0 0 1.047</pose>
     </include>
     <!-- <include>
       <uri>
