@@ -56,6 +56,13 @@ def generate_launch_description():
         arguments=['-d', rviz_cfg],
         condition=IfCondition(rviz_use)
     )
+    static_tf_node = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        name='odom_to_camera_init_tf',
+        arguments=['0', '0', '0', '0', '0', '0', 'odom', 'camera_init'],
+        output='screen'
+    )
 
     ld = LaunchDescription()
     ld.add_action(declare_use_sim_time_cmd)
@@ -66,5 +73,6 @@ def generate_launch_description():
 
     ld.add_action(fast_lio_node)
     ld.add_action(rviz_node)
+    ld.add_action(static_tf_node)
 
     return ld

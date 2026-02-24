@@ -274,4 +274,6 @@ tat publish tf camera_init va body ,
 chay lenh sau de keo 2 tf trung tam 
 
 ros2 run tf2_ros static_transform_publisher 0 0 0 0 0 0 odom camera_init
+
+ros2 launch slam_toolbox online_async_launch.py slam_params_file:=/home/vinh/Desktop/ttbot_ws/src/ttbot_mapping/config/mapper_params.yaml use_sim_time:=False
 ```
