@@ -259,21 +259,5 @@ config file preprocess.cpp
   cach chay : 
 ```bash   
 Terminal1 : ros2 launch ttbot_bringup sim.launch.py
-
-Terminal2 : ros2 launch fast_lio mapping.launch.py config_file:=velodyne_sim.yaml use_sim_time:=true
-
-
-Terminal3:
-sudo apt update
-sudo apt install ros-humble-grid-map-msgs ros-humble-grid-map-ros
-
-ros2 launch pointcloud_to_grid grid_trajectory.launch.py topic:=/cloud_registered maph_topic_name:=/map
-
-
-tat publish tf camera_init va body , 
-chay lenh sau de keo 2 tf trung tam 
-
-ros2 run tf2_ros static_transform_publisher 0 0 0 0 0 0 odom camera_init
-
-ros2 launch slam_toolbox online_async_launch.py slam_params_file:=/home/vinh/Desktop/ttbot_ws/src/ttbot_mapping/config/mapper_params.yaml use_sim_time:=False
+Terminal2 : ros2 launch ttbot_mapping mapping_sim.launch.py
 ```
